@@ -27,14 +27,18 @@
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
     />
-    <link rel="stylesheet" href="site.css?v=1" />
-    <script src="liquid-glass.js?v=5" defer></script>
-    <script src="site.js?v=1" defer></script>
+    <link rel="stylesheet" href="site.css?v=5" />
+    <script src="liquid-glass.js?v=6" defer></script>
+    <script src="site.js?v=5" defer></script>
   </head>
   <body>
     <div class="site-scene" id="site-scene" aria-hidden="true">
       <canvas id="glass-canvas"></canvas>
     </div>
+    <header class="site-header" aria-label="Septuagint 个人主页">
+      <span class="site-monogram" aria-hidden="true">S<span>✦</span></span>
+      <span class="site-wordmark">SEPTUAGINT<small>PERSONAL SPACE</small></span>
+    </header>
     <button
       type="button"
       class="theme-toggle glass-surface"
@@ -47,6 +51,12 @@
       <span aria-hidden="true">◐</span>
     </button>
     <main>
+      <div class="margin-note margin-note--intro" aria-hidden="true">
+        <span class="eyebrow">WELCOME TO MY ORBIT</span>
+        <p>A little<br /><em>universe.</em></p>
+        <span class="note-rule"></span>
+        <span class="note-caption">好奇心，和一些微小的引力。</span>
+      </div>
       <article
         class="card glass-surface"
         data-radius="36"
@@ -62,11 +72,13 @@
             alt="Septuagint 的头像"
           />
         </div>
+        <p class="eyebrow card-greeting">HELLO, I'M</p>
         <h1 id="name">
           <span class="sr-only">Septuagint</span
           ><span id="typed-name" aria-hidden="true">Septuagint</span>
         </h1>
-        <p class="tagline">Computing the universe with me. ...</p>
+        <p class="tagline">Computing the universe with me.</p>
+        <div class="links-heading" aria-hidden="true"><span>ELSEWHERE</span><span>01 — 06</span></div>
         <nav class="links" aria-label="社交与联系">
           <a
             class="glass-surface"
@@ -74,7 +86,7 @@
             href="https://steamcommunity.com/id/septugaint"
             rel="noopener noreferrer"
             ><i class="fab fa-steam" aria-hidden="true"></i
-            ><span>Steam</span></a
+            ><span>Steam</span><span class="link-arrow" aria-hidden="true">↗</span></a
           >
           <a
             class="glass-surface"
@@ -82,7 +94,7 @@
             href="https://github.com/Septuagint0201"
             rel="noopener noreferrer"
             ><i class="fab fa-github" aria-hidden="true"></i
-            ><span>GitHub</span></a
+            ><span>GitHub</span><span class="link-arrow" aria-hidden="true">↗</span></a
           >
           <a
             class="glass-surface"
@@ -90,7 +102,7 @@
             href="https://discord.gg/2TCxargaSe"
             rel="noopener noreferrer"
             ><i class="fab fa-discord" aria-hidden="true"></i
-            ><span>Discord</span></a
+            ><span>Discord</span><span class="link-arrow" aria-hidden="true">↗</span></a
           >
           <a
             class="glass-surface"
@@ -98,14 +110,14 @@
             href="https://x.com/septuagint0504"
             rel="noopener noreferrer"
             ><i class="fab fa-x-twitter" aria-hidden="true"></i
-            ><span>X</span></a
+            ><span>X</span><span class="link-arrow" aria-hidden="true">↗</span></a
           >
           <a
             class="glass-surface"
             data-radius="14"
             href="mailto:septuagintks@gmail.com"
             ><i class="fas fa-envelope" aria-hidden="true"></i
-            ><span>Email</span></a
+            ><span>Email</span><span class="link-arrow" aria-hidden="true">↗</span></a
           >
           <a
             class="glass-surface"
@@ -113,10 +125,16 @@
             href="https://www.pixiv.net/users/81025946"
             rel="noopener noreferrer"
             ><i class="fas fa-palette" aria-hidden="true"></i
-            ><span>Pixiv</span></a
+            ><span>Pixiv</span><span class="link-arrow" aria-hidden="true">↗</span></a
           >
         </nav>
       </article>
+      <div class="margin-note margin-note--outro" aria-hidden="true">
+        <span class="note-star">✦</span>
+        <p>Different places.<br /><em>Same me.</em></p>
+        <span class="note-caption">沿着轨道，在别处相遇。</span>
+      </div>
     </main>
+    <footer class="site-footer"><span>A LITTLE CORNER OF THE INTERNET</span><span aria-hidden="true">✦</span><span>STAY CURIOUS</span></footer>
   </body>
 </html>

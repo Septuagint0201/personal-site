@@ -4,6 +4,8 @@
   --text: #f9f8ff;
   --subtext: #eeeaf9;
   --accent: #d0c6ec;
+  --decoration: rgba(237, 232, 255, 0.7);
+  --hairline: rgba(227, 218, 255, 0.3);
   --fallback-glass: rgba(252, 252, 247, 0.15);
   --fallback-link: rgba(252, 252, 247, 0.0975);
   --scene-overlay: rgba(17, 22, 43, 0.65);
@@ -17,12 +19,14 @@
   --text: #171d30;
   --subtext: #292e42;
   --accent: #6e6591;
+  --decoration: rgba(46, 43, 71, 0.76);
+  --hairline: rgba(71, 61, 102, 0.28);
   --fallback-glass: rgba(14, 17, 26, 0.15);
   --fallback-link: rgba(14, 17, 26, 0.0975);
-  --scene-overlay: rgba(247, 246, 243, 0.09);
+  --scene-overlay: rgba(41, 49, 70, 0.26);
   --shadow: rgba(26, 30, 48, 0.17);
   --text-shadow: 0 1px 3px rgba(255, 255, 255, 0.32);
-  background: #eef0f5;
+  background: #c6cbd6;
 }
 *,
 *::before,
@@ -35,10 +39,17 @@
 body {
   margin: 0;
   color: var(--text);
-  background:
-    linear-gradient(var(--scene-overlay), var(--scene-overlay)),
-    url("bg.jpg") center / cover fixed;
   min-width: 280px;
+}
+.site-scene::before {
+  content: "";
+  position: absolute;
+  inset: 12% 13%;
+  border-radius: 64px;
+  background: linear-gradient(var(--scene-overlay), var(--scene-overlay)), url("bg.jpg") center / cover;
+}
+.site-scene[data-renderer]::before {
+  display: none;
 }
 .site-scene {
   position: fixed;
@@ -59,7 +70,7 @@ body {
 main {
   min-height: 100vh;
   min-height: 100svh;
-  padding: 68px 20px 38px;
+  padding: 76px 20px 54px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -69,7 +80,7 @@ main {
 .card {
   width: 340px;
   max-width: 100%;
-  padding: 34px 28px 30px;
+  padding: 26px 28px 24px;
   border-radius: 36px;
   text-align: center;
   box-shadow:
@@ -88,15 +99,15 @@ main {
 }
 .avatar-wrap {
   position: relative;
-  width: 96px;
-  height: 96px;
-  margin: 0 auto 24px;
+  width: 88px;
+  height: 88px;
+  margin: 0 auto 16px;
 }
 .avatar {
   display: block;
   position: relative;
-  width: 96px;
-  height: 96px;
+  width: 88px;
+  height: 88px;
   border-radius: 50%;
   object-fit: cover;
   box-shadow:
@@ -165,21 +176,22 @@ h1 {
 .tagline {
   font-size: 12px;
   line-height: 1.7;
-  margin: 0 0 26px;
+  margin: 0 0 18px;
   color: var(--subtext);
   text-shadow: var(--text-shadow);
 }
 .links {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 .links a {
   position: relative;
   display: flex;
   min-height: 44px;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
+  justify-content: flex-start;
+  gap: 13px;
+  padding: 0 17px;
   color: var(--text);
   font-size: 14px;
   font-weight: 500;
@@ -190,7 +202,7 @@ h1 {
     inset 0 0 0 1px #ffffff6b,
     0 3px 10px #171c300a;
   text-shadow: var(--text-shadow);
-  transition: box-shadow 0.2s ease;
+  transition: box-shadow 0.22s ease, transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 body:not(.glass-active) .links a {
   background: var(--fallback-link);
@@ -200,18 +212,147 @@ body:not(.glass-active) .links a {
   text-align: center;
   font-size: 17px;
 }
+.link-arrow {
+  margin-left: auto;
+  font-size: 18px;
+  font-weight: 400;
+  opacity: 0.6;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.links a:hover .link-arrow,
+.links a:focus-visible .link-arrow {
+  opacity: 1;
+  transform: translate(2px, -2px);
+}
+.links-heading {
+  display: flex;
+  justify-content: space-between;
+  margin: 0 2px 11px;
+  color: var(--subtext);
+  font-size: 9px;
+  letter-spacing: 1.8px;
+}
+.eyebrow {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 2.2px;
+  line-height: 1.6;
+}
+.card-greeting {
+  margin: 0 0 5px;
+  color: var(--subtext);
+}
+.site-header {
+  position: absolute;
+  z-index: 2;
+  top: max(25px, env(safe-area-inset-top));
+  left: max(36px, env(safe-area-inset-left));
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  color: var(--text);
+}
+.site-monogram {
+  position: relative;
+  font: italic 39px/1 Georgia, "Times New Roman", serif;
+}
+.site-monogram > span {
+  position: absolute;
+  top: -3px;
+  right: -9px;
+  font: 13px/1 sans-serif;
+  color: var(--accent);
+}
+.site-wordmark {
+  font-size: 10px;
+  letter-spacing: 2.3px;
+}
+.site-wordmark small {
+  display: block;
+  margin-top: 5px;
+  color: var(--decoration);
+  font-size: 8px;
+  letter-spacing: 1.6px;
+}
+.margin-note {
+  position: absolute;
+  width: clamp(180px, 20vw, 280px);
+  color: var(--decoration);
+  pointer-events: none;
+}
+.margin-note--intro {
+  left: max(48px, calc(50% - 560px));
+  top: 34%;
+}
+:root[data-theme="light"] .margin-note {
+  color: #36334d;
+  text-shadow: 0 1px 12px #ffffffb3;
+}
+.margin-note p {
+  margin: 21px 0;
+  font: 400 clamp(34px, 4vw, 54px)/1.12 Georgia, "Times New Roman", serif;
+  letter-spacing: -1.8px;
+}
+.margin-note em {
+  font-weight: 400;
+}
+.note-rule {
+  display: block;
+  width: 37px;
+  height: 1px;
+  margin: 25px 0 17px;
+  background: var(--hairline);
+}
+.note-caption {
+  font-size: 10px;
+  letter-spacing: 2px;
+  line-height: 1.8;
+}
+.margin-note--outro {
+  right: max(48px, calc(50% - 560px));
+  bottom: 23%;
+  width: 195px;
+}
+.margin-note--outro p {
+  font-size: 27px;
+  line-height: 1.25;
+  letter-spacing: -0.6px;
+  margin: 19px 0 16px;
+}
+.note-star {
+  font-size: 30px;
+  color: var(--accent);
+}
+.site-footer {
+  position: relative;
+  z-index: 1;
+  min-height: 50px;
+  margin-top: -50px;
+  padding: 10px 24px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 17px;
+  color: var(--decoration);
+  font-size: 8px;
+  letter-spacing: 1.8px;
+}
+.site-footer > span:nth-child(2) {
+  font-size: 11px;
+  color: var(--accent);
+}
 .links a:hover {
   box-shadow:
-    inset 0 0 0 1.5px #ffffffc7,
-    0 7px 18px var(--shadow);
+    inset 0 0 0 1px #ffffffa6,
+    0 8px 22px var(--shadow), 0 0 18px #e3d9ff18;
 }
 .links a:active {
-  box-shadow: inset 0 0 0 2px #ffffffcc;
+  box-shadow: inset 0 0 0 1px #ffffffb3;
 }
 .links a:focus-visible,
 .theme-toggle:focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 5px;
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
 }
 .theme-toggle {
   position: fixed;
@@ -225,19 +366,49 @@ body:not(.glass-active) .links a {
   padding: 0;
   border: 0;
   border-radius: 50%;
+  overflow: hidden;
   color: var(--text);
   font: inherit;
   font-size: 21px;
   box-shadow:
-    inset 0 0 0 1px #ffffff75,
-    0 6px 20px var(--shadow);
+    inset 0 0 0 0.5px #ffffff26,
+    0 4px 16px #11162b12;
   cursor: pointer;
   text-shadow: var(--text-shadow);
+  transition: box-shadow 0.22s ease, transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .theme-toggle:hover {
   box-shadow:
-    inset 0 0 0 1.5px #ffffffc7,
-    0 8px 24px var(--shadow);
+    inset 0 0 0 0.5px #ffffff59,
+    0 6px 20px var(--shadow);
+}
+.links a::before,
+.theme-toggle::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(ellipse 140px 90px at var(--shine-x, 50%) var(--shine-y, 50%), #ffffff32, #ffffff00 80%);
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+.links a:hover::before,
+.theme-toggle:hover::before,
+.links a:focus-visible::before,
+.theme-toggle:focus-visible::before {
+  opacity: 0.5;
+}
+@media (hover: hover) and (pointer: fine) {
+  .links a:hover,
+  .theme-toggle:hover {
+    transform: scale(1.025);
+  }
+}
+.links a:active,
+.theme-toggle:active {
+  transform: scale(0.97);
+  transition-duration: 0.09s;
 }
 .ripple {
   position: absolute;
@@ -267,6 +438,29 @@ body:not(.glass-active) .links a {
   white-space: nowrap;
   border: 0;
 }
+@media (max-width: 1000px) {
+  .margin-note {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .site-header {
+    left: max(24px, env(safe-area-inset-left));
+    top: max(23px, env(safe-area-inset-top));
+  }
+  .site-monogram {
+    font-size: 32px;
+  }
+  .site-wordmark {
+    font-size: 9px;
+    letter-spacing: 1.8px;
+  }
+  .site-footer {
+    gap: 11px;
+    font-size: 7px;
+    letter-spacing: 1.1px;
+  }
+}
 @media (max-width: 380px) {
   main {
     padding-inline: 16px;
@@ -279,6 +473,10 @@ body:not(.glass-active) .links a {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .links a,
+  .theme-toggle {
+    transform: none !important;
+  }
   *,
   *::before,
   *::after {

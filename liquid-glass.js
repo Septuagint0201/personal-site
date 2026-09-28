@@ -25,6 +25,8 @@
     uniform float u_profile;
     uniform float u_enabled;
     uniform vec2 u_light;
+    uniform vec4 u_lens; // Optional scene-only cursor lens: center, radius, strength.
+    uniform vec3 u_surface; // Reflection gain, hover amount, interactive lighting.
 
     vec3 sampleScene(vec2 p) {
       vec2 uv = vec2(p.x / u_resolution.x, 1.0 - p.y / u_resolution.y);
@@ -55,7 +57,14 @@
     void main() {
       vec2 p = vec2(gl_FragCoord.x / u_dpr, u_resolution.y - gl_FragCoord.y / u_dpr);
       vec3 original = sampleScene(p);
-      if (u_rect.z <= 0.0) { gl_FragColor = vec4(original, 1.0); return; }
+      if (u_rect.z <= 0.0) {
+        vec2 delta = p - u_lens.xy;
+        float r = length(delta) / max(u_lens.z, 1.0);
+        float falloff = pow(max(1.0 - r * r, 0.0), 3.0);
+        // Smooth radial magnification; zero displacement and slope at the boundary.
+        gl_FragColor = vec4(sampleScene(p - delta * falloff * u_lens.w), 1.0);
+        return;
+      }
       vec2 halfSize = u_rect.zw * 0.5;
       vec2 local = p - u_rect.xy - halfSize;
       float radius = min(u_radius, min(halfSize.x, halfSize.y));
@@ -117,8 +126,10 @@
       vec3 light = normalize(vec3((u_light - p) / u_resolution, 0.65));
       float sheen = pow(max(dot(normal, normalize(light + vec3(0.0, 0.0, 1.0))), 0.0), 40.0);
       float rim = exp(-abs(dist + 0.8) * 1.5);
-      float directional = 0.4 + 0.6 * max(dot(outward, normalize(vec2(-0.65, -0.8))), 0.0);
-      color += vec3(1.0, 0.98, 0.95) * (fresnel * 0.22 + sheen * 0.12 + rim * directional * 0.24);
+      vec2 lightDirection = mix(vec2(-0.65, -0.8), (u_light - p) / max(length(u_light - p), 0.001), u_surface.z);
+      float directional = 0.4 + 0.6 * max(dot(outward, lightDirection / max(length(lightDirection), 0.001)), 0.0);
+      float hotspot = exp(-dot(u_light - p, u_light - p) / 9500.0) * u_surface.y;
+      color += vec3(1.0, 0.98, 0.95) * ((fresnel * 0.22 + sheen * 0.12 + rim * directional * 0.24) * u_surface.x + hotspot * (0.075 + rim * 0.18));
       color -= edge * (1.0 - directional) * 0.065;
       float coverage = 1.0 - smoothstep(-0.7, 0.7, dist);
       gl_FragColor = vec4(mix(original, color, coverage), 1.0);
@@ -211,6 +222,8 @@
           "profile",
           "enabled",
           "light",
+          "lens",
+          "surface",
         ])
           this.uniforms[name] = gl.getUniformLocation(program, `u_${name}`);
         const texture = () => {
@@ -347,7 +360,22 @@
       );
       gl.uniform1f(u.enabled, state.refraction === false ? 0 : 1);
       gl.uniform2f(u.light, ...this.light);
+      const lens = state.lens;
+      gl.uniform4f(u.lens, 0, 0, 1, 0);
       let input = this.sourceTexture;
+      let passOffset = 0;
+      // Warp the scene once before compositing glass, never the DOM or hit targets.
+      if (lens && lens.strength > 0) {
+        const target = this.targets[0];
+        gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
+        gl.bindTexture(gl.TEXTURE_2D, input);
+        gl.uniform4f(u.rect, 0, 0, -1, 0);
+        gl.uniform4f(u.lens, lens.x, lens.y, lens.radius, lens.strength);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        input = target.texture;
+        passOffset = 1;
+        gl.uniform4f(u.lens, 0, 0, 1, 0);
+      }
       const bounds = this.element.getBoundingClientRect();
       const surfaces = [
         ...(this.options.getSurfaces?.() ||
@@ -359,7 +387,7 @@
           nested =
             !!surface.parentElement.closest(".glass-surface") ||
             surface.hasAttribute("data-glass-compact");
-        const target = this.targets[index % 2];
+        const target = this.targets[(index + passOffset) % 2];
         gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
         gl.bindTexture(gl.TEXTURE_2D, input);
         gl.uniform4f(
@@ -369,7 +397,10 @@
           rect.width,
           rect.height,
         );
-        gl.uniform1f(u.radius, +surface.dataset.radius || 14);
+        const scale = rect.width / (surface.offsetWidth || rect.width);
+        gl.uniform1f(u.radius, (+surface.dataset.radius || 14) * scale);
+        const effects = this.options.getSurfaceEffects?.(surface) || {};
+        gl.uniform3f(u.surface, effects.reflection ?? 1, effects.hover ?? 0, effects.interactive ? 1 : 0);
         gl.uniform4f(
           u.material,
           m.ior,
