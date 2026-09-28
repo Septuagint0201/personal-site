@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f6f5f2" />
+    <title>Glass Lab · Septuagint</title>
+    <link rel="stylesheet" href="glass-lab.css?v=5" />
+    <script src="liquid-glass.js?v=5" defer></script>
+    <script src="glass-lab.js?v=5" defer></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="index.html" aria-label="返回 Septuagint 首页"
+        ><span class="brand-mark">S<span>°</span></span
+        ><span
+          >Septuagint<span class="brand-divider">/</span><b>Glass Lab</b></span
+        ></a
+      >
+      <span class="header-note"
+        >材质探索 <span class="tiny-dot"></span> EXPERIMENT 001</span
+      >
+      <a class="back-link" href="index.html"
+        >返回主页 <span aria-hidden="true">↗</span></a
+      >
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">A STUDY IN LIGHT & MATERIAL</p>
+          <h1 id="page-title">让光，穿过界面<span>。</span></h1>
+          <p class="intro-copy">同一束光，四种玻璃。找到属于这个主页的质感。</p>
+        </div>
+        <div class="render-status" id="render-status" role="status">
+          <span class="status-light"></span
+          ><span id="render-status-text">正在准备玻璃材质</span>
+        </div>
+      </section>
+
+      <section class="workspace" aria-label="玻璃实时预览与材质设置">
+        <div class="preview-column">
+          <div class="preview-toolbar">
+            <div class="segmented" aria-label="预览背景">
+              <button type="button" data-scene="aurora" aria-pressed="true">
+                流光</button
+              ><button type="button" data-scene="original" aria-pressed="false">
+                原站背景</button
+              ><button type="button" data-scene="grid" aria-pressed="false">
+                折射网格
+              </button>
+            </div>
+            <button
+              class="icon-button"
+              id="theme-toggle"
+              aria-label="切换至暗色场景"
+              title="切换明暗场景"
+            >
+              ◐
+            </button>
+          </div>
+          <div class="scene" id="main-scene">
+            <canvas class="scene-canvas" aria-hidden="true"></canvas>
+            <div class="scene-heading">
+              <span>THE GLASS COLLECTION</span><span>01 — 04</span>
+            </div>
+            <article
+              class="profile glass-surface"
+              data-radius="36"
+              id="profile-card"
+            >
+              <button
+                type="button"
+                class="drag-handle"
+                id="drag-handle"
+                aria-label="移动预览卡片：方向键移动，Home 键居中"
+                title="拖动或按方向键移动卡片，Home 键居中"
+              >
+                <span></span>
+              </button>
+              <div class="profile-content">
+                <div class="avatar-shell">
+                  <img
+                    src="avatar.jpg"
+                    width="68"
+                    height="68"
+                    alt="Septuagint 的头像"
+                  /><span class="online-dot" title="在线"></span>
+                </div>
+                <p class="profile-kicker">HELLO, I'M</p>
+                <h2>Septuagint<span>✳</span></h2>
+                <p class="profile-description">
+                  Computing the universe with me.
+                </p>
+                <div class="profile-links">
+                  <a
+                    class="glass-surface"
+                    data-radius="14"
+                    href="https://github.com/Septuagint0201"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    ><span class="link-symbol">⌘</span><span>GitHub</span
+                    ><span class="link-arrow">↗</span></a
+                  >
+                  <a
+                    class="glass-surface"
+                    data-radius="14"
+                    href="https://steamcommunity.com/id/septugaint"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    ><span class="link-symbol">◎</span><span>Steam</span
+                    ><span class="link-arrow">↗</span></a
+                  >
+                  <div class="link-pair">
+                    <a
+                      class="glass-surface"
+                      data-radius="14"
+                      href="https://discord.gg/2TCxargaSe"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      ><span>Discord</span><span class="link-arrow">↗</span></a
+                    ><a
+                      class="glass-surface"
+                      data-radius="14"
+                      href="https://x.com/septuagint0504"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      ><span>X / Twitter</span
+                      ><span class="link-arrow">↗</span></a
+                    >
+                  </div>
+                  <div class="link-pair">
+                    <a
+                      class="glass-surface"
+                      data-radius="14"
+                      href="mailto:septuagintks@gmail.com"
+                      ><span>Email</span><span class="link-arrow">↗</span></a
+                    ><a
+                      class="glass-surface"
+                      data-radius="14"
+                      href="https://www.pixiv.net/users/81025946"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      ><span>Pixiv</span><span class="link-arrow">↗</span></a
+                    >
+                  </div>
+                </div>
+                <div class="profile-footer">
+                  <span class="small-star">✳</span> A little corner of my
+                  universe
+                </div>
+              </div>
+            </article>
+            <div class="scene-footer">
+              <span><span class="live-dot"></span> LIVE MATERIAL</span
+              ><span>拖动卡片顶部，观察光线偏移</span>
+            </div>
+          </div>
+          <div class="preview-caption">
+            <span
+              ><b id="preview-name">01 / 清透水晶</b
+              ><span id="preview-description"
+                >轻盈、通透，让背景自然流入界面。</span
+              ></span
+            ><button type="button" id="refraction-toggle" aria-pressed="true">
+              <span class="toggle-track"></span>折射开启
+            </button>
+          </div>
+        </div>
+
+        <aside class="inspector" aria-label="材质参数">
+          <div class="inspector-heading">
+            <div>
+              <p class="eyebrow">MATERIAL SETTINGS</p>
+              <h2>调一束自己的光</h2>
+            </div>
+            <span class="inspector-symbol">✳</span>
+          </div>
+          <label class="field-label" for="preset-select"
+            >当前预设 <span id="modified-label">原始参数</span></label
+          >
+          <select id="preset-select">
+            <option value="crystal">01　清透水晶 · Crystal</option>
+            <option value="silk">02　柔雾丝绒 · Silk</option>
+            <option value="liquid">03　厚液态 · Liquid</option>
+            <option value="prism">04　光谱棱镜 · Prism</option>
+          </select>
+          <p class="preset-note" id="preset-note">
+            最轻盈的玻璃，适合保留原站插画的细节。
+          </p>
+          <div class="edge-settings">
+            <label class="field-label" for="edge-profile"
+              >边缘厚度曲线 <span>截面形状</span></label
+            >
+            <select id="edge-profile">
+              <option value="soft" selected>双曲缓入 · 柔和收平</option>
+              <option value="rounded">圆弧 · 连续圆润过渡</option>
+              <option value="bevel">倒角 · 原版过渡</option>
+            </select>
+            <svg class="edge-diagram" viewBox="0 0 230 43" aria-hidden="true">
+              <path
+                id="edge-curve"
+                d="M 10 35 A 27 27 0 0 1 37 8 H 220 V 35 Z"
+              />
+            </svg>
+            <p id="edge-profile-note">
+              双曲缓入：外缘略陡，向内延伸更宽，尾段柔和收平。
+            </p>
+          </div>
+          <div class="control-list">
+            <div class="control">
+              <label for="ior"
+                >折射率 <output for="ior" id="ior-value">1.45</output></label
+              ><input
+                id="ior"
+                type="range"
+                min="1"
+                max="2"
+                step="0.01"
+                value="1.45"
+              />
+              <div class="range-labels"><span>平直</span><span>弯折</span></div>
+            </div>
+            <div class="control">
+              <label for="thickness"
+                >玻璃厚度
+                <output for="thickness" id="thickness-value"
+                  >28 px</output
+                ></label
+              ><input
+                id="thickness"
+                type="range"
+                min="0"
+                max="80"
+                step="1"
+                value="28"
+              />
+              <div class="range-labels"><span>轻薄</span><span>饱满</span></div>
+            </div>
+            <div class="control">
+              <label for="roughness"
+                >表面雾度
+                <output for="roughness" id="roughness-value"
+                  >0.8 px</output
+                ></label
+              ><input
+                id="roughness"
+                type="range"
+                min="0"
+                max="8"
+                step="0.1"
+                value="0.8"
+              />
+            </div>
+            <div class="control">
+              <label for="dispersion"
+                >色散强度
+                <output for="dispersion" id="dispersion-value"
+                  >0.02</output
+                ></label
+              ><input
+                id="dispersion"
+                type="range"
+                min="0"
+                max="0.12"
+                step="0.005"
+                value="0.02"
+              />
+            </div>
+            <div class="control">
+              <label for="tint"
+                >底色遮罩 <output for="tint" id="tint-value">0%</output></label
+              ><input
+                id="tint"
+                type="range"
+                min="0"
+                max="0.45"
+                step="0.01"
+                value="0"
+              />
+            </div>
+          </div>
+          <div class="tint-settings">
+            <label class="field-label" for="tint-mode"
+              >遮罩配色 <span id="tint-color">浅色模式 · 深色遮罩</span></label
+            >
+            <select id="tint-mode">
+              <option value="inverted" selected>
+                反转 · 深色用白，浅色用深
+              </option>
+              <option value="follow-theme">原版 · 深色用深，浅色用白</option>
+            </select>
+            <p id="tint-hint">
+              当前为 0%，底色完全透明。试用 20% 即可观察互换效果。
+            </p>
+            <div class="tint-shortcuts">
+              <button class="text-button" data-tint-level="0.2">试用 20%</button
+              ><button class="text-button" data-tint-level="0">回到 0%</button
+              ><button class="text-button" id="restore-custom">
+                恢复我的参数
+              </button>
+            </div>
+          </div>
+          <div class="inspector-actions">
+            <button class="text-button" id="reset">↺ 重置参数</button
+            ><button class="text-button" id="export">导出参数 ↗</button>
+          </div>
+          <div class="choice-area">
+            <button class="choose-button" id="choose">
+              选择这组预设 <span>↗</span>
+            </button>
+            <p id="choice-status" role="status">
+              选择会保存在本机，供后续主页改版使用。
+            </p>
+          </div>
+        </aside>
+      </section>
+
+      <section class="collection" aria-labelledby="collection-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">FOUR WAYS TO FEEL THE LIGHT</p>
+            <h2 id="collection-title">
+              不同质感，同场比较<span> / 选一个你喜欢的</span>
+            </h2>
+          </div>
+          <span class="comparison-note">相同背景 · 相同光线</span>
+        </div>
+        <div class="preset-grid">
+          <button
+            type="button"
+            class="preset-card"
+            data-preset="crystal"
+            aria-pressed="true"
+          >
+            <div class="swatch-scene" data-material="crystal">
+              <canvas class="scene-canvas" aria-hidden="true"></canvas>
+              <div class="swatch-glass glass-surface" data-radius="23">
+                <span class="swatch-star">✳</span><span>Crystal</span
+                ><span class="swatch-pill glass-surface" data-radius="12"
+                  >Pure & clear ↗</span
+                >
+              </div>
+            </div>
+            <div class="preset-card-heading">
+              <span><small>01</small> 清透水晶</span
+              ><span class="selection-indicator">↗</span>
+            </div>
+            <p>低雾度 / 细腻边缘 / 最轻盈</p>
+          </button>
+          <button
+            type="button"
+            class="preset-card"
+            data-preset="silk"
+            aria-pressed="false"
+          >
+            <div class="swatch-scene" data-material="silk">
+              <canvas class="scene-canvas" aria-hidden="true"></canvas>
+              <div class="swatch-glass glass-surface" data-radius="23">
+                <span class="swatch-star">✳</span><span>Silk</span
+                ><span class="swatch-pill glass-surface" data-radius="12"
+                  >Softly diffused ↗</span
+                >
+              </div>
+            </div>
+            <div class="preset-card-heading">
+              <span><small>02</small> 柔雾丝绒</span
+              ><span class="selection-indicator">↗</span>
+            </div>
+            <p>柔和散射 / 安静细腻 / 阅读友好</p>
+          </button>
+          <button
+            type="button"
+            class="preset-card"
+            data-preset="liquid"
+            aria-pressed="false"
+          >
+            <div class="swatch-scene" data-material="liquid">
+              <canvas class="scene-canvas" aria-hidden="true"></canvas>
+              <div class="swatch-glass glass-surface" data-radius="23">
+                <span class="swatch-star">✳</span><span>Liquid</span
+                ><span class="swatch-pill glass-surface" data-radius="12"
+                  >Light in motion ↗</span
+                >
+              </div>
+            </div>
+            <div class="preset-card-heading">
+              <span><small>03</small> 厚液态</span
+              ><span class="selection-indicator">↗</span>
+            </div>
+            <p>饱满曲面 / 明显折射 / 液滴感</p>
+          </button>
+          <button
+            type="button"
+            class="preset-card"
+            data-preset="prism"
+            aria-pressed="false"
+          >
+            <div class="swatch-scene" data-material="prism">
+              <canvas class="scene-canvas" aria-hidden="true"></canvas>
+              <div class="swatch-glass glass-surface" data-radius="23">
+                <span class="swatch-star">✳</span><span>Prism</span
+                ><span class="swatch-pill glass-surface" data-radius="12"
+                  >A spectrum of light ↗</span
+                >
+              </div>
+            </div>
+            <div class="preset-card-heading">
+              <span><small>04</small> 光谱棱镜</span
+              ><span class="selection-indicator">↗</span>
+            </div>
+            <p>彩色边缘 / 强烈弯折 / 更具个性</p>
+          </button>
+        </div>
+      </section>
+      <footer class="page-footer">
+        <span
+          >SEPTUAGINT <span class="footer-star">✳</span> MATERIAL
+          EXPLORATIONS</span
+        >
+        <details>
+          <summary>关于这块玻璃 <span>+</span></summary>
+          <p>
+            WebGL
+            根据圆角曲面的法线、折射率和厚度计算折射方向，对场景纹理重新采样；色散分别采样
+            RGB
+            通道，雾度使用多点采样。卡片与按钮逐层合成，文字保持清晰。这是屏幕空间折射，不是完整三维光线追踪，也不能自动折射任意
+            DOM 内容。算法使用
+            <a
+              href="https://registry.khronos.org/OpenGL/specs/gl/GLSLangSpec.4.60.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              >GLSL refract</a
+            >。无 WebGL 时明确切换为普通磨砂预览。
+          </p>
+        </details>
+        <span>DESIGNED TO LET LIGHT IN.</span>
+      </footer>
+    </main>
+    <noscript
+      ><p class="noscript-note">
+        请启用 JavaScript，以使用真实折射预览和材质选择。
+      </p></noscript
+    >
+  </body>
+</html>
