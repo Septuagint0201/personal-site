@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark light" />
+  <title>Depth Lab · Septuagint</title>
+  <link rel="stylesheet" href="depth-lab.css?v=1" />
+  <script src="depth-background.js?v=1" defer></script>
+  <script src="liquid-glass.js?v=6" defer></script>
+  <script src="depth-lab.js?v=2" defer></script>
+</head>
+<body>
+  <header class="lab-header"><a href="index.html" class="brand">S<span>✦</span><small>SEPTUAGINT / LAB</small></a><a href="index.html">返回当前主页 ↗</a></header>
+  <main>
+    <div class="intro"><div><p class="eyebrow">EXPERIMENT 002 / DEPTH & LIGHT</p><h1>让背景，拥有纵深。</h1></div><p>移动光标，转动一块悬浮的玻璃。<br />四种空间表达，同一幅插画。</p></div>
+    <div class="workspace">
+      <section class="preview" aria-label="3D 背景实时预览">
+        <div class="preview-toolbar"><span id="render-status" role="status">准备场景…</span><div><button id="theme" type="button">切换浅色</button><button id="freeze" type="button" aria-pressed="false">冻结视角</button><button id="profile-toggle" type="button" aria-pressed="false">隐藏卡片</button></div></div>
+        <div class="depth-scene" id="depth-scene" tabindex="0" aria-label="移动光标或按方向键调整背景视角，Home 键回正">
+          <canvas id="depth-canvas" aria-hidden="true"></canvas>
+          <div class="scene-caption" aria-hidden="true"><span>01 / LEVITATE</span><span>LIGHT, HELD IN SPACE</span></div>
+          <article class="profile glass-surface" data-radius="30" aria-label="前景玻璃卡片参考">
+            <img class="avatar" src="avatar.jpg" alt="Septuagint 的头像" width="72" height="72" />
+            <p class="eyebrow">HELLO, I'M</p><h2>Septuagint</h2><p class="tagline">Computing the universe with me.</p>
+            <div class="sample-links" aria-label="前景按钮样式参考">
+              <div class="glass-surface" data-radius="12"><span>⌘</span> GitHub <span>↗</span></div>
+              <div class="glass-surface" data-radius="12"><span>◎</span> Steam <span>↗</span></div>
+              <div class="glass-surface" data-radius="12"><span>✳</span> Discord <span>↗</span></div>
+              <div class="glass-surface" data-radius="12"><span>✉</span> Email <span>↗</span></div>
+            </div>
+          </article>
+          <div class="scene-bottom"><span id="angle-readout">X 0.0° / Y 0.0°</span><span>MOVE TO EXPLORE · ← ↑ ↓ →</span></div>
+          <p class="fallback" hidden>此浏览器暂时无法显示实时 3D 折射，当前为静态插画。</p>
+        </div>
+        <div class="preview-caption"><div><p class="eyebrow" id="preset-tag">01 / LEVITATE</p><h2 id="preset-title">悬浮晶板</h2></div><p id="preset-description">一整块通透玻璃托住插画，边缘随视角折光，克制而清晰。</p></div>
+      </section>
+      <aside class="controls" aria-label="背景预设与参数">
+        <p class="eyebrow">CHOOSE A DIRECTION</p>
+        <div class="presets" role="group" aria-label="选择背景预设">
+          <button type="button" data-preset="levitate" aria-pressed="true"><span class="swatch swatch-single" aria-hidden="true"></span><span><b>01　悬浮晶板</b><small>清透 · 完整画幅 · 轻透视</small></span><i>↗</i></button>
+          <button type="button" data-preset="strata" aria-pressed="false"><span class="swatch swatch-stack" aria-hidden="true"></span><span><b>02　错层叠影</b><small>三层玻璃 · 景深 · 视差</small></span><i>↗</i></button>
+          <button type="button" data-preset="lens" aria-pressed="false"><span class="swatch swatch-lens" aria-hidden="true"></span><span><b>03　弧光透镜</b><small>弧面 · 饱满折射 · 柔光</small></span><i>↗</i></button>
+          <button type="button" data-preset="prism" aria-pressed="false"><span class="swatch swatch-prism" aria-hidden="true"></span><span><b>04　折光屏风</b><small>三片折面 · 色散 · 空间张力</small></span><i>↗</i></button>
+        </div>
+        <div class="parameters">
+          <label for="tilt">透视幅度 <output id="tilt-value">10°</output></label><input id="tilt" type="range" min="0" max="22" value="10" step="1" />
+          <label for="depth">玻璃厚度 <output id="depth-value">35</output></label><input id="depth" type="range" min="10" max="85" value="35" step="1" />
+          <label for="shine">反光强度 <output id="shine-value">45%</output></label><input id="shine" type="range" min="0" max="100" value="45" step="1" />
+        </div>
+        <div class="actions"><button id="reset" type="button">恢复预设</button><button id="export" type="button">导出参数 ↗</button></div>
+        <button class="choose" id="choose" type="button">选择这组背景 ↗</button>
+        <p class="choice-status" id="choice-status" role="status">仅在此实验页预览，不会改变线上主页。</p>
+        <details><summary>关于这一版</summary><p>背景采用 WebGL 相机射线、倾斜玻璃平面与折射采样。前景沿用已确认的玻璃参数，字体保持平直。支持键盘调整；减少动态效果时仅手动改变视角。</p></details>
+      </aside>
+    </div>
+  </main>
+  <footer>SEPTUAGINT <span>✦</span> STUDIES IN LIGHT</footer>
+</body>
+</html>

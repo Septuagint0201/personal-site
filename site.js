@@ -12,11 +12,10 @@
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
   const themeButton = document.getElementById("themeToggle");
   const scene = document.getElementById("site-scene");
-  const sourceImage = new Image();
-  const staticScene = document.createElement("canvas");
-  const staticContext = staticScene.getContext("2d");
-  let sourceReady = false;
-  let sceneKey = "";
+  // Approved export: septuagint-depth-strata.json (2026-09-29).
+  const chosenBackground = Object.freeze({ mode: 1, tilt: 15, depth: 31, shine: 48 });
+  const camera = { x: 0.35, y: -0.18 };
+  const cameraTarget = { ...camera };
   let theme = "system";
   let dark = true;
   let renderer = null;
@@ -59,7 +58,6 @@
     try {
       localStorage.setItem("theme", theme);
     } catch {}
-    sceneKey = "";
     renderer?.refreshBackground();
   }
   themeButton.addEventListener("click", () =>
@@ -90,127 +88,17 @@
       driftY: 0,
     }));
   }
-  // Paint into the background texture so the orbits bend through the glass too.
-  // Static ornaments share the cached image; animation only redraws particles.
-  function paintOrnaments(ctx, width, height) {
-    const ink = dark ? "225,217,251" : "76,67,106";
-    const compact = width <= 1000;
-    const cx = width * 0.5;
-    const cy = height * 0.51;
-    const rx = Math.min(width * 0.39, 550);
-    const ry = Math.min(height * 0.29, 260);
-    ctx.save();
-    ctx.lineWidth = 0.75;
-    ctx.strokeStyle = `rgba(${ink},${compact ? 0.15 : 0.25})`;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, rx, ry, -0.4, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.strokeStyle = `rgba(${ink},.12)`;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, rx * 1.13, ry * 1.2, 0.32, -0.7, Math.PI * 1.2);
-    ctx.stroke();
-    ctx.setLineDash([2, 8]);
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, rx * 1.18, ry * 1.34, -0.4, 3.4, 5.3);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Sparse fixed stars anchor the composition without adding more motion.
-    const stars = compact
-      ? [[0.12, 0.2, 5], [0.88, 0.78, 5]]
-      : [[0.16, 0.2, 7], [0.81, 0.27, 9], [0.28, 0.76, 5], [0.9, 0.62, 4]];
-    ctx.fillStyle = `rgba(${ink},.55)`;
-    for (const [x, y, radius] of stars) {
-      const px = width * x;
-      const py = height * y;
-      ctx.beginPath();
-      ctx.moveTo(px, py - radius);
-      ctx.quadraticCurveTo(px + radius * 0.12, py - radius * 0.12, px + radius, py);
-      ctx.quadraticCurveTo(px + radius * 0.12, py + radius * 0.12, px, py + radius);
-      ctx.quadraticCurveTo(px - radius * 0.12, py + radius * 0.12, px - radius, py);
-      ctx.quadraticCurveTo(px - radius * 0.12, py - radius * 0.12, px, py - radius);
-      ctx.fill();
-    }
-    if (!compact) {
-      const angle = 3.8;
-      const x = rx * Math.cos(angle);
-      const y = ry * Math.sin(angle);
-      const px = cx + x * Math.cos(-0.4) - y * Math.sin(-0.4);
-      const py = cy + x * Math.sin(-0.4) + y * Math.cos(-0.4);
-      ctx.strokeStyle = `rgba(${ink},.4)`;
-      ctx.beginPath();
-      ctx.arc(px, py, 6, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(px, py, 2, 0, Math.PI * 2);
-      ctx.fill();
-      // Open corner marks leave the illustration itself unframed.
-      ctx.strokeStyle = `rgba(${ink},.2)`;
-      for (const [fx, fy, dx, dy] of [[30, 98, 1, 1], [width - 30, height - 74, -1, -1]]) {
-        ctx.beginPath();
-        ctx.moveTo(fx, fy + 18 * dy);
-        ctx.lineTo(fx, fy);
-        ctx.lineTo(fx + 18 * dx, fy);
-        ctx.stroke();
-      }
-    }
-    ctx.restore();
-  }
+  const background = window.DepthBackground.createRenderer({
+    onChange: () => {
+      scene.dataset.depthRenderer = background.failed ? "fallback" : "webgl";
+      renderer?.refreshBackground();
+    },
+  });
+  scene.dataset.depthRenderer = background.failed ? "fallback" : "webgl";
+  scene.dataset.depthPreset = "strata";
   function paintBackground(ctx, width, height) {
     prepareParticles(width, height);
-    const dpr = ctx.getTransform().a;
-    const key = [width, height, dpr, dark, sourceReady].join("/");
-    if (sceneKey !== key) {
-      sceneKey = key;
-      staticScene.width = Math.round(width * dpr);
-      staticScene.height = Math.round(height * dpr);
-      staticContext.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const base = dark ? "#171d30" : "#c6cbd6";
-      staticContext.fillStyle = base;
-      staticContext.fillRect(0, 0, width, height);
-      const glow = staticContext.createRadialGradient(width * 0.52, height * 0.42, 0, width * 0.52, height * 0.42, width * 0.65);
-      glow.addColorStop(0, dark ? "#363750" : "#dce0e7");
-      glow.addColorStop(1, base);
-      staticContext.fillStyle = glow;
-      staticContext.fillRect(0, 0, width, height);
-      if (sourceReady) {
-        const compact = width <= 1000;
-        const artWidth = compact ? width - 32 : Math.min(width * 0.74, 1160);
-        const artHeight = Math.min(height * 0.76, 760);
-        const artX = compact ? 16 : width * 0.56 - artWidth / 2;
-        const artY = (height - artHeight) / 2;
-        const scale = Math.max(
-          artWidth / sourceImage.width,
-          artHeight / sourceImage.height,
-        );
-        staticContext.save();
-        staticContext.beginPath();
-        staticContext.roundRect(artX, artY, artWidth, artHeight, compact ? 40 : 80);
-        staticContext.clip();
-        staticContext.drawImage(
-          sourceImage,
-          artX + (artWidth - sourceImage.width * scale) / 2,
-          artY + (artHeight - sourceImage.height * scale) / 2,
-          sourceImage.width * scale,
-          sourceImage.height * scale,
-        );
-        staticContext.fillStyle = dark
-          ? "rgba(17,22,43,.62)"
-          : "rgba(41,49,70,.26)";
-        staticContext.fillRect(artX, artY, artWidth, artHeight);
-        const fade = staticContext.createLinearGradient(artX, 0, artX + artWidth, 0);
-        fade.addColorStop(0, base);
-        fade.addColorStop(0.22, dark ? "#171d3000" : "#c6cbd600");
-        fade.addColorStop(0.7, dark ? "#171d3000" : "#c6cbd600");
-        fade.addColorStop(1, base);
-        staticContext.fillStyle = fade;
-        staticContext.fillRect(artX, artY, artWidth, artHeight);
-        staticContext.restore();
-      }
-      paintOrnaments(staticContext, width, height);
-    }
-    ctx.clearRect(0, 0, width, height);
-    ctx.drawImage(staticScene, 0, 0, width, height);
+    background.paint(ctx, width, height, { ...chosenBackground, dark }, camera);
     const color = dark ? "219,212,249" : "88,79,124";
     for (let i = 0; i < particles.length; i++) {
       const particle = particles[i];
@@ -258,6 +146,12 @@
     // Smooth lens motion at display cadence; particle texture stays capped at 30fps.
     if (lens.strength > 0) renderer.request();
     if (now - lastFrame >= 1000 / 30) {
+      const ease = 1 - Math.exp(-seconds / 0.09);
+      camera.x += (cameraTarget.x - camera.x) * ease;
+      camera.y += (cameraTarget.y - camera.y) * ease;
+      if (Math.hypot(cameraTarget.x - camera.x, cameraTarget.y - camera.y) < 0.001) {
+        camera.x = cameraTarget.x; camera.y = cameraTarget.y;
+      }
       lastFrame = now;
       for (const p of particles) {
         if (pointer.x !== null) {
@@ -292,7 +186,7 @@
     if (!animationFrame && !document.hidden && !reducedMotion.matches)
       animationFrame = requestAnimationFrame(animate);
   }
-  if (window.LiquidGlass && staticContext) {
+  if (window.LiquidGlass) {
     renderer = new window.LiquidGlass.Renderer(scene, {
       maxDpr: 1.5,
       maxPixels: 1800000,
@@ -323,18 +217,6 @@
     renderer.resize();
     startAnimation();
   }
-  sourceImage.onload = () => {
-    sourceReady = true;
-    sceneKey = "";
-    renderer?.refreshBackground();
-  };
-  sourceImage.onerror = () => {
-    sourceReady = false;
-    sceneKey = "";
-    renderer?.refreshBackground();
-  };
-  sourceImage.src = "bg.jpg";
-
   let lastPointerUpdate = 0;
   window.addEventListener(
     "pointermove",
@@ -346,6 +228,8 @@
       }
       pointer.x = event.clientX;
       pointer.y = event.clientY;
+      cameraTarget.x = Math.max(-1, Math.min(1, event.clientX / innerWidth * 2 - 1));
+      cameraTarget.y = Math.max(-1, Math.min(1, event.clientY / innerHeight * 2 - 1));
       if (renderer && performance.now() - lastPointerUpdate > 33) {
         lastPointerUpdate = performance.now();
         renderer.light = [pointer.x, pointer.y];
@@ -356,6 +240,7 @@
   );
   function clearPointer() {
     pointer.x = pointer.y = null;
+    cameraTarget.x = cameraTarget.y = 0;
     if (renderer) {
       renderer.light = [-100, -150];
       renderer.request();
