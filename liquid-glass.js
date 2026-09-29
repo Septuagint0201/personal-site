@@ -61,7 +61,7 @@
         vec2 delta = p - u_lens.xy;
         float r = length(delta) / max(u_lens.z, 1.0);
         float falloff = pow(max(1.0 - r * r, 0.0), 3.0);
-        // Smooth radial magnification; zero displacement and slope at the boundary.
+        // Signed radial lens: positive magnifies, negative compresses; smooth boundary.
         gl_FragColor = vec4(sampleScene(p - delta * falloff * u_lens.w), 1.0);
         return;
       }
@@ -365,7 +365,7 @@
       let input = this.sourceTexture;
       let passOffset = 0;
       // Warp the scene once before compositing glass, never the DOM or hit targets.
-      if (lens && lens.strength > 0) {
+      if (lens && Math.abs(lens.strength) > 0) {
         const target = this.targets[0];
         gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
         gl.bindTexture(gl.TEXTURE_2D, input);

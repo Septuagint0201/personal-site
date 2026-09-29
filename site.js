@@ -24,6 +24,7 @@
   let particleHeight = 0;
   let animationFrame = 0;
   let lastFrame = 0;
+  let flowTime = 0;
   const pointer = { x: null, y: null };
   const lens = { x: 0, y: 0, radius: 170, strength: 0 };
   try {
@@ -81,8 +82,10 @@
     particles = Array.from({ length: count }, () => ({
       x: Math.random() * width,
       y: Math.random() * height,
-      vx: (Math.random() - 0.5) * 11,
-      vy: (Math.random() - 0.5) * 11,
+      vx: 18 + Math.random() * 12,
+      vy: (Math.random() - 0.5) * 18,
+      speed: 0.7 + Math.random() * 0.6,
+      trail: [],
       radius: Math.random() * 1.5 + 0.8,
       driftX: 0,
       driftY: 0,
@@ -102,7 +105,20 @@
     const color = dark ? "219,212,249" : "88,79,124";
     for (let i = 0; i < particles.length; i++) {
       const particle = particles[i];
-      const proximity = pointer.x === null ? 0 : Math.max(0, 1 - Math.hypot(pointer.x - particle.x, pointer.y - particle.y) / 180);
+      const proximity = pointer.x === null ? 0 : Math.max(0, 1 - Math.hypot(pointer.x - particle.x, pointer.y - particle.y) / 240);
+      // Short fading paths reveal the current without smearing the glass background.
+      if (!reducedMotion.matches && particle.trail.length > 1) {
+        ctx.lineCap = "round";
+        ctx.lineWidth = particle.radius * 0.8;
+        for (let step = 1; step < particle.trail.length; step++) {
+          const from = particle.trail[step - 1], to = particle.trail[step];
+          ctx.beginPath();
+          ctx.moveTo(from.x, from.y);
+          ctx.lineTo(to.x, to.y);
+          ctx.strokeStyle = `rgba(${color},${(0.2 + proximity * 0.18) * step / particle.trail.length})`;
+          ctx.stroke();
+        }
+      }
       if (dark || proximity > 0.1) {
         ctx.beginPath();
         ctx.arc(particle.x, particle.y, particle.radius * (3 + proximity * 2), 0, Math.PI * 2);
@@ -128,23 +144,28 @@
   }
   function animate(now) {
     animationFrame = 0;
+    // Clear the last lens frame even if a media-change event arrives late.
+    if (reducedMotion.matches) {
+      lens.strength = 0;
+      renderer?.refreshBackground();
+      return;
+    }
     if (
       document.hidden ||
-      reducedMotion.matches ||
       !renderer ||
       renderer.failed
     )
       return;
     const seconds = Math.min((now - lastFrame) / 1000, 0.08);
-    const targetStrength = pointer.x === null ? 0 : 0.13;
+    const targetStrength = pointer.x === null ? 0 : -0.13;
     lens.strength += (targetStrength - lens.strength) * 0.18;
-    if (lens.strength < 0.0001) lens.strength = 0;
+    if (Math.abs(lens.strength) < 0.0001) lens.strength = 0;
     if (pointer.x !== null) {
       lens.x += (pointer.x - lens.x) * 0.3;
       lens.y += (pointer.y - lens.y) * 0.3;
     }
     // Smooth lens motion at display cadence; particle texture stays capped at 30fps.
-    if (lens.strength > 0) renderer.request();
+    if (Math.abs(lens.strength) > 0) renderer.request();
     if (now - lastFrame >= 1000 / 30) {
       const ease = 1 - Math.exp(-seconds / 0.09);
       camera.x += (cameraTarget.x - camera.x) * ease;
@@ -153,30 +174,42 @@
         camera.x = cameraTarget.x; camera.y = cameraTarget.y;
       }
       lastFrame = now;
+      flowTime += seconds;
+      const follow = 1 - Math.exp(-1.5 * seconds);
       for (const p of particles) {
+        // A slowly changing vector field forms broad, continuous currents.
+        const x = p.x / particleWidth, y = p.y / particleHeight;
+        const angle = Math.sin(x * 4.2 + flowTime * 0.22) * 0.8
+          + Math.cos(y * 5.1 - flowTime * 0.18) * 0.55;
+        const speed = (30 + 8 * Math.sin(y * 3.8 + flowTime * 0.35)) * p.speed;
+        p.vx += (Math.cos(angle) * speed - p.vx) * follow;
+        p.vy += (Math.sin(angle) * speed - p.vy) * follow;
         if (pointer.x !== null) {
           const dx = pointer.x - p.x, dy = pointer.y - p.y;
           const distance = Math.hypot(dx, dy);
-          if (distance > 1 && distance < 190) {
-            const force = (1 - distance / 190) * 38;
-            // Gentle attraction plus a tangential drift; soft core avoids a pile-up.
-            const pull = distance < 30 ? -0.7 : 1;
-            p.driftX += (dx / distance * pull - dy / distance * 0.55) * force * seconds;
-            p.driftY += (dy / distance * pull + dx / distance * 0.55) * force * seconds;
+          if (distance > 1 && distance < 240) {
+            const force = (1 - distance / 240) * 76;
+            // Smooth outward pressure dominates a light tangential drift.
+            const push = 0.65 + 1.15 * (1 - distance / 240);
+            const swirl = 0.35;
+            p.driftX += (-dx / distance * push - dy / distance * swirl) * force * seconds;
+            p.driftY += (-dy / distance * push + dx / distance * swirl) * force * seconds;
           }
         }
-        p.driftX *= Math.exp(-1.4 * seconds);
-        p.driftY *= Math.exp(-1.4 * seconds);
+        p.driftX *= Math.exp(-0.55 * seconds);
+        p.driftY *= Math.exp(-0.55 * seconds);
         p.x += (p.vx + p.driftX) * seconds;
         p.y += (p.vy + p.driftY) * seconds;
-        if (p.x < 0 || p.x > particleWidth) {
-          p.vx *= -1;
-          p.x = Math.max(0, Math.min(particleWidth, p.x));
-        }
-        if (p.y < 0 || p.y > particleHeight) {
-          p.vy *= -1;
-          p.y = Math.max(0, Math.min(particleHeight, p.y));
-        }
+        // Wrap outside the viewport so no abrupt bounce or cross-screen trail is visible.
+        const margin = 32;
+        let wrapped = false;
+        if (p.x < -margin) { p.x = particleWidth + margin; wrapped = true; }
+        else if (p.x > particleWidth + margin) { p.x = -margin; wrapped = true; }
+        if (p.y < -margin) { p.y = particleHeight + margin; wrapped = true; }
+        else if (p.y > particleHeight + margin) { p.y = -margin; wrapped = true; }
+        if (wrapped) p.trail.length = 0;
+        p.trail.push({ x: p.x, y: p.y });
+        if (p.trail.length > 10) p.trail.shift();
       }
       renderer.refreshBackground();
     }
