@@ -12,6 +12,11 @@
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
   const themeButton = document.getElementById("themeToggle");
   const scene = document.getElementById("site-scene");
+  const card = document.querySelector(".card");
+  const name = document.getElementById("typed-name");
+  const fullName = name.textContent;
+  let typingTimer = 0;
+  let readingBounds = null;
   // Approved export: septuagint-depth-strata.json (2026-09-29).
   const chosenBackground = Object.freeze({ mode: 1, tilt: 15, depth: 31, shine: 48 });
   const camera = { x: 0.35, y: -0.18 };
@@ -71,13 +76,34 @@
   });
   applyTheme(theme);
 
+  // Keep DOM reads outside the particle loop, including on short scrolling screens.
+  function updateReadingBounds() {
+    const bounds = card.getBoundingClientRect();
+    readingBounds = {
+      left: bounds.left - 12,
+      right: bounds.right + 12,
+      top: bounds.top - 12,
+      bottom: bounds.bottom + 12,
+    };
+    renderer?.refreshBackground();
+  }
+  function particleVisibility(x, y) {
+    if (!readingBounds) return 1;
+    const dx = Math.max(readingBounds.left - x, 0, x - readingBounds.right);
+    const dy = Math.max(readingBounds.top - y, 0, y - readingBounds.bottom);
+    const distance = Math.min(1, Math.hypot(dx, dy) / 140);
+    return 0.24 + 0.76 * distance * distance * (3 - 2 * distance);
+  }
+  updateReadingBounds();
+  if (window.ResizeObserver) new ResizeObserver(updateReadingBounds).observe(card);
+
   function prepareParticles(width, height) {
     if (particleWidth === width && particleHeight === height) return;
     particleWidth = width;
     particleHeight = height;
     const count = Math.min(
-      72,
-      Math.max(28, Math.round((width * height) / 14500)),
+      48,
+      Math.max(18, Math.round((width * height) / 22000)),
     );
     particles = Array.from({ length: count }, () => ({
       x: Math.random() * width,
@@ -101,10 +127,11 @@
   scene.dataset.depthPreset = "strata";
   function paintBackground(ctx, width, height) {
     prepareParticles(width, height);
-    background.paint(ctx, width, height, { ...chosenBackground, dark }, camera);
+    background.paint(ctx, width, height, { ...chosenBackground, dark, composition: 1 }, camera);
     const color = dark ? "219,212,249" : "88,79,124";
     for (let i = 0; i < particles.length; i++) {
       const particle = particles[i];
+      const visibility = particleVisibility(particle.x, particle.y);
       const proximity = pointer.x === null ? 0 : Math.max(0, 1 - Math.hypot(pointer.x - particle.x, pointer.y - particle.y) / 240);
       // Short fading paths reveal the current without smearing the glass background.
       if (!reducedMotion.matches && particle.trail.length > 1) {
@@ -115,19 +142,19 @@
           ctx.beginPath();
           ctx.moveTo(from.x, from.y);
           ctx.lineTo(to.x, to.y);
-          ctx.strokeStyle = `rgba(${color},${(0.2 + proximity * 0.18) * step / particle.trail.length})`;
+          ctx.strokeStyle = `rgba(${color},${(0.12 + proximity * 0.1) * visibility * step / particle.trail.length})`;
           ctx.stroke();
         }
       }
       if (dark || proximity > 0.1) {
         ctx.beginPath();
         ctx.arc(particle.x, particle.y, particle.radius * (3 + proximity * 2), 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${color},${0.07 + proximity * 0.12})`;
+        ctx.fillStyle = `rgba(${color},${(0.04 + proximity * 0.06) * visibility})`;
         ctx.fill();
       }
       ctx.beginPath();
       ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${color},${0.65 + proximity * 0.3})`;
+      ctx.fillStyle = `rgba(${color},${(0.45 + proximity * 0.16) * visibility})`;
       ctx.fill();
       for (let j = i + 1; j < particles.length; j++) {
         const other = particles[j];
@@ -136,7 +163,9 @@
         ctx.beginPath();
         ctx.moveTo(particle.x, particle.y);
         ctx.lineTo(other.x, other.y);
-        ctx.strokeStyle = `rgba(${color},${(0.24 + proximity * 0.28) * (1 - distance / 155)})`;
+        const lineVisibility = Math.min(visibility, particleVisibility(other.x, other.y),
+          particleVisibility((particle.x + other.x) / 2, (particle.y + other.y) / 2));
+        ctx.strokeStyle = `rgba(${color},${(0.13 + proximity * 0.14) * lineVisibility * (1 - distance / 155)})`;
         ctx.lineWidth = 0.7;
         ctx.stroke();
       }
@@ -306,12 +335,15 @@
       button.style.setProperty("--shine-y", `${(event.clientY - bounds.top) / bounds.height * 100}%`);
     });
   });
-  window.addEventListener("scroll", () => renderer?.request(), {
+  window.addEventListener("scroll", updateReadingBounds, {
     passive: true,
   });
-  window.addEventListener("resize", () => renderer?.resize());
-  document.fonts.ready.then(() => renderer?.request());
-  window.addEventListener("load", () => renderer?.request());
+  window.addEventListener("resize", () => {
+    updateReadingBounds();
+    renderer?.resize();
+  });
+  document.fonts.ready.then(updateReadingBounds);
+  window.addEventListener("load", updateReadingBounds);
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
       clearPointer();
@@ -324,6 +356,7 @@
     }
   });
   reducedMotion.addEventListener("change", () => {
+    finishTyping();
     if (reducedMotion.matches) {
       clearPointer();
       lens.strength = 0;
@@ -348,17 +381,27 @@
       setTimeout(() => ripple.remove(), 600);
     }),
   );
-  const name = document.getElementById("typed-name");
+  function finishTyping() {
+    clearTimeout(typingTimer);
+    typingTimer = 0;
+    name.textContent = fullName;
+    delete name.dataset.typing;
+  }
   if (!reducedMotion.matches) {
-    const text = name.textContent;
     let index = 0;
+    name.dataset.typing = "true";
     name.textContent = "";
     const type = () => {
-      name.textContent = text.slice(0, ++index);
-      if (index < text.length) setTimeout(type, 110);
+      if (reducedMotion.matches) {
+        finishTyping();
+        return;
+      }
+      name.textContent = fullName.slice(0, ++index);
+      if (index < fullName.length) typingTimer = setTimeout(type, 110);
+      else finishTyping();
     };
     type();
-  }
+  } else finishTyping();
   const avatar = document.querySelector(".avatar");
   const avatarFallback = () => {
     avatar.hidden = true;

@@ -27,10 +27,10 @@
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
     />
-    <link rel="stylesheet" href="site.css?v=5" />
-    <script src="depth-background.js?v=1" defer></script>
+    <link rel="stylesheet" href="site.css?v=6" />
+    <script src="depth-background.js?v=2" defer></script>
     <script src="liquid-glass.js?v=7" defer></script>
-    <script src="site.js?v=10" defer></script>
+    <script src="site.js?v=11" defer></script>
   </head>
   <body>
     <div class="site-scene" id="site-scene" aria-hidden="true">
@@ -52,6 +52,7 @@
       <span aria-hidden="true">◐</span>
     </button>
     <main>
+      <p class="compact-intro" aria-hidden="true">A little <em>universe.</em><span>✦</span></p>
       <div class="margin-note margin-note--intro" aria-hidden="true">
         <span class="eyebrow">WELCOME TO MY ORBIT</span>
         <p>A little<br /><em>universe.</em></p>
@@ -63,24 +64,35 @@
         data-radius="36"
         aria-labelledby="name"
       >
-        <div class="avatar-wrap">
-          <span class="avatar-fallback" aria-hidden="true">S</span>
-          <img
-            src="avatar.jpg"
-            class="avatar"
-            width="96"
-            height="96"
-            alt="Septuagint 的头像"
-          />
+        <div class="profile">
+          <div class="avatar-wrap">
+            <span class="avatar-fallback" aria-hidden="true">S</span>
+            <img
+              src="avatar.jpg"
+              class="avatar"
+              width="96"
+              height="96"
+              alt="Septuagint 的头像"
+            />
+          </div>
+          <p class="eyebrow card-greeting">HELLO, I'M</p>
+          <h1 id="name">
+            <span class="sr-only">Septuagint</span
+            ><span id="typed-name" aria-hidden="true">Septuagint</span>
+          </h1>
+          <p class="tagline">Computing the universe with me.</p>
+          <p class="interests" aria-label="兴趣：代码、游戏、图像"><span>代码</span><span>游戏</span><span>图像</span></p>
         </div>
-        <p class="eyebrow card-greeting">HELLO, I'M</p>
-        <h1 id="name">
-          <span class="sr-only">Septuagint</span
-          ><span id="typed-name" aria-hidden="true">Septuagint</span>
-        </h1>
-        <p class="tagline">Computing the universe with me.</p>
-        <div class="links-heading" aria-hidden="true"><span>ELSEWHERE</span><span>01 — 06</span></div>
         <nav class="links" aria-label="社交与联系">
+          <a
+            class="glass-surface link-featured"
+            data-radius="18"
+            href="https://github.com/Septuagint0201"
+            rel="noopener noreferrer"
+            ><i class="fab fa-github" aria-hidden="true"></i
+            ><span class="link-copy"><span>GitHub</span><small>Code &amp; projects</small></span><span class="link-arrow" aria-hidden="true">↗</span></a
+          >
+          <div class="links-heading" aria-hidden="true"><span>FIND ME ELSEWHERE</span><span>✦</span></div>
           <a
             class="glass-surface"
             data-radius="14"
@@ -88,14 +100,6 @@
             rel="noopener noreferrer"
             ><i class="fab fa-steam" aria-hidden="true"></i
             ><span>Steam</span><span class="link-arrow" aria-hidden="true">↗</span></a
-          >
-          <a
-            class="glass-surface"
-            data-radius="14"
-            href="https://github.com/Septuagint0201"
-            rel="noopener noreferrer"
-            ><i class="fab fa-github" aria-hidden="true"></i
-            ><span>GitHub</span><span class="link-arrow" aria-hidden="true">↗</span></a
           >
           <a
             class="glass-surface"
@@ -116,17 +120,17 @@
           <a
             class="glass-surface"
             data-radius="14"
-            href="mailto:septuagintks@gmail.com"
-            ><i class="fas fa-envelope" aria-hidden="true"></i
-            ><span>Email</span><span class="link-arrow" aria-hidden="true">↗</span></a
-          >
-          <a
-            class="glass-surface"
-            data-radius="14"
             href="https://www.pixiv.net/users/81025946"
             rel="noopener noreferrer"
             ><i class="fas fa-palette" aria-hidden="true"></i
             ><span>Pixiv</span><span class="link-arrow" aria-hidden="true">↗</span></a
+          >
+          <a
+            class="glass-surface link-contact"
+            data-radius="14"
+            href="mailto:septuagintks@gmail.com"
+            ><i class="fas fa-envelope" aria-hidden="true"></i
+            ><span>Say hello</span><span class="contact-label">Email</span><span class="link-arrow" aria-hidden="true">↗</span></a
           >
         </nav>
       </article>
