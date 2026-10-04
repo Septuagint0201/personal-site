@@ -2,6 +2,7 @@ import { chapters } from "./chapters.js";
 import { createMenuGlass } from "./menu-glass.js";
 import { createRingNavigator } from "./ring-navigation.js";
 import { createGlassArrows } from "./glass-arrows.js";
+import { createViewportRingGeometry } from "./menu-orbit-geometry.js";
 import "./interaction.css";
 
 const stage = document.querySelector("#card-stage");
@@ -60,7 +61,6 @@ const glass = createMenuGlass({
 });
 // The index and Chapter 01 share the same directional navigation model.
 // Compression only changes the spacing: every card still follows one Y/Z circle.
-const TAU = Math.PI * 2;
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 const pointer = { x: 0, y: 0 };
 const tilt = { x: 0, y: 0 };
@@ -68,6 +68,7 @@ let frame = 0;
 let previousTime = 0;
 let start = null;
 let focusedSide = 0;
+let entryHovered = false;
 let geometry;
 const navigator = createRingNavigator({
   count: chapters.length,
@@ -82,72 +83,21 @@ document.querySelector("#page-total").textContent = String(
   chapters.length,
 ).padStart(2, "0");
 
-function projectEdges(angle, radius, perspective, height) {
-  const y = radius * Math.sin(angle);
-  const z = radius * (Math.cos(angle) - 1);
-  return [-height / 2, height / 2].map(
-    (edge) =>
-      (perspective * (y + edge * Math.cos(angle))) /
-      (perspective - z - edge * Math.sin(angle)),
-  );
-}
 function orbitalAngle(logical) {
-  return 2 * Math.atan(geometry.compression * Math.tan(logical / 2));
+  return geometry.angle(logical);
 }
 function measure() {
-  const height = stack.clientHeight;
-  const radius = Math.max(innerHeight * 0.82, height * 1.6);
-  const perspective = radius * 4;
-  // Solve for 66% visible neighbour area instead of guessing a CSS offset.
-  let low = 0.01,
-    high = 1.25;
-  for (let iteration = 0; iteration < 28; iteration++) {
-    const theta = (low + high) * 0.5;
-    const [top, bottom] = projectEdges(theta, radius, perspective, height);
-    if ((bottom - height / 2) / (bottom - top) > 0.66) high = theta;
-    else low = theta;
-  }
-  const step = TAU / chapters.length;
-  geometry = {
-    height,
-    radius,
-    perspective,
-    compression: Math.tan((low + high) / 4) / Math.tan(step / 2),
-    preview: 0,
-  };
-  // Pointer travel is calibrated to 90% exposure at the approached edge.
-  low = 0;
-  high = Math.min(0.38, Math.PI - step - 0.02);
-  for (let iteration = 0; iteration < 28; iteration++) {
-    const offset = (low + high) * 0.5;
-    const near = projectEdges(
-      orbitalAngle(-step - offset),
-      radius,
-      perspective,
-      height,
-    );
-    const front = projectEdges(
-      orbitalAngle(-offset),
-      radius,
-      perspective,
-      height,
-    );
-    if ((front[0] - near[0]) / (near[1] - near[0]) > 0.9) high = offset;
-    else low = offset;
-  }
-  geometry.preview = (low + high) * 0.5;
-  const reach = Math.max(
-    ...projectEdges(
-      orbitalAngle(step + geometry.preview),
-      radius,
-      perspective,
-      height,
-    ).map(Math.abs),
+  stage.style.setProperty(
+    "--card-height",
+    `${Math.min(400, innerHeight * 0.37)}px`,
   );
-  // Reserve the full approached orbit, including the mobile triangle controls.
-  stage.style.height = `${Math.ceil(reach * 2 + (innerWidth <= 760 ? 112 : 32))}px`;
-  stage.style.perspective = `${perspective}px`;
-  stage.dataset.orbitDiameter = (radius * 2).toFixed(1);
+  geometry = createViewportRingGeometry({
+    viewportHeight: innerHeight,
+    cardHeight: stack.clientHeight,
+    count: chapters.length,
+  });
+  stage.style.perspective = `${geometry.perspective}px`;
+  stage.dataset.orbitDiameter = (geometry.radius * 2).toFixed(1);
   stage.dataset.neighbourExposure = "0.66";
   stage.dataset.edgeExposure = "0.90";
   applyPreview();
@@ -159,9 +109,7 @@ function applyPreview() {
   const edge = clamp(Math.abs(y), 0, 1);
   const progressive = edge * edge * (3 - 2 * edge);
   navigator.setPreview(
-    motion.matches
-      ? 0
-      : (-Math.sign(y) * progressive * geometry.preview) / 0.38,
+    motion.matches ? 0 : (Math.sign(y) * progressive * geometry.preview) / 0.38,
   );
 }
 function updateSelection(announce = true) {
@@ -194,7 +142,7 @@ function paint() {
     const angle = orbitalAngle(logical);
     const y = geometry.radius * Math.sin(angle);
     const z = geometry.radius * (Math.cos(angle) - 1);
-    const pitch = (angle * 180) / Math.PI + tilt.y * -1.6;
+    const pitch = (angle * 180) / Math.PI;
     const active = i === navigator.index;
     const front = Math.abs(angle) < Math.PI * 0.56;
     const direction = logical < 0 ? -1 : 1;
@@ -220,14 +168,18 @@ function animate(now) {
   if (document.hidden) return;
   const dt = Math.min((now - previousTime) / 1000 || 0.016, 0.032);
   previousTime = now;
-  const moving = navigator.update(dt);
+  const moving = !entryHovered && navigator.update(dt);
   const blend = motion.matches ? 1 : 1 - Math.exp(-9 * dt);
-  tilt.x += ((motion.matches ? 0 : pointer.x) - tilt.x) * blend;
-  tilt.y += ((motion.matches ? 0 : pointer.y) - tilt.y) * blend;
+  if (!entryHovered) {
+    tilt.x += ((motion.matches ? 0 : pointer.x) - tilt.x) * blend;
+    tilt.y += ((motion.matches ? 0 : pointer.y) - tilt.y) * blend;
+  }
   paint();
   if (
     moving ||
-    Math.abs(tilt.x - pointer.x) + Math.abs(tilt.y - pointer.y) > 0.002
+    (!entryHovered &&
+      !motion.matches &&
+      Math.abs(tilt.x - pointer.x) + Math.abs(tilt.y - pointer.y) > 0.002)
   )
     frame = requestAnimationFrame(animate);
 }
@@ -238,6 +190,7 @@ function invalidate() {
   }
 }
 function rest() {
+  entryHovered = false;
   pointer.x = pointer.y = 0;
   applyPreview();
   invalidate();
@@ -261,6 +214,7 @@ cards.forEach((card) => {
     stage.focus({ preventScroll: true });
   });
   button.addEventListener("focus", () => {
+    if (!button.matches(":focus-visible")) return;
     focusedSide = Number(card.dataset.direction);
     applyPreview();
     invalidate();
@@ -273,7 +227,7 @@ cards.forEach((card) => {
 });
 document.querySelector("#previous").addEventListener("click", () => step(-1));
 document.querySelector("#next").addEventListener("click", () => step(1));
-document.querySelector(".collection").addEventListener("keydown", (event) => {
+window.addEventListener("keydown", (event) => {
   if (event.altKey || event.ctrlKey || event.metaKey) return;
   const direction = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -1, ArrowDown: 1 }[
     event.key
@@ -288,7 +242,7 @@ document.querySelector(".collection").addEventListener("keydown", (event) => {
   else if (fromCard) stage.focus({ preventScroll: true });
   invalidate();
 });
-stage.addEventListener("pointermove", (event) => {
+window.addEventListener("pointermove", (event) => {
   if (
     event.pointerType === "touch" ||
     !finePointer.matches ||
@@ -296,7 +250,9 @@ stage.addEventListener("pointermove", (event) => {
     motion.matches
   )
     return;
-  // Holding a live hit target steady avoids links sliding out from under a click.
+  entryHovered = !!event.target.closest(".enter-chapter");
+  // Stop the physical spring while the live entry target is being clicked.
+  if (entryHovered) return;
   if (event.target.closest("a,button") && !event.target.closest(".side-select"))
     return;
   const bounds = stack.getBoundingClientRect();
@@ -306,14 +262,14 @@ stage.addEventListener("pointermove", (event) => {
     1,
   );
   pointer.y = clamp(
-    (event.clientY - bounds.top - bounds.height / 2) / (bounds.height * 0.8),
+    (event.clientY - innerHeight / 2) / (innerHeight * 0.44),
     -1,
     1,
   );
   applyPreview();
   invalidate();
 });
-stage.addEventListener("pointerleave", rest);
+window.addEventListener("pointerleave", rest);
 stage.addEventListener("pointerdown", (event) => {
   if (
     event.button !== 0 ||
@@ -352,20 +308,12 @@ stage.addEventListener("lostpointercapture", () => {
 let wheelTotal = 0,
   wheelTime = 0,
   wheelLockedUntil = 0;
-stage.addEventListener(
+window.addEventListener(
   "wheel",
   (event) => {
     if (
       event.ctrlKey ||
       Math.max(Math.abs(event.deltaY), Math.abs(event.deltaX)) < 1
-    )
-      return;
-    // On short windows the orbit is taller than the viewport. Let the page
-    // bring the focused card fully into view before the wheel controls it.
-    const focusedBounds = cards[navigator.index].getBoundingClientRect();
-    if (
-      Math.abs(event.deltaY) >= Math.abs(event.deltaX) &&
-      (focusedBounds.top < 48 || focusedBounds.bottom > innerHeight - 24)
     )
       return;
     event.preventDefault();

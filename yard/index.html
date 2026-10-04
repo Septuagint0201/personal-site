@@ -15,6 +15,21 @@
     <link rel="stylesheet" href="/src/menu.css" />
     <noscript
       ><style>
+        html, body {
+          height: auto;
+          overflow: auto;
+        }
+        .collection-header {
+          position: relative;
+        }
+        .collection-intro {
+          position: static;
+          width: auto;
+          padding: 30px;
+          translate: none;
+          clip-path: none;
+          height: auto;
+        }
         .card-stack,
         .gallery-toolbar,
         .chapter-rail,
@@ -25,6 +40,9 @@
           display: block;
         }
         .card-stage {
+          position: relative;
+          width: auto;
+          pointer-events: auto;
           height: auto;
           cursor: default;
         }
@@ -49,7 +67,10 @@
       <a class="wordmark" href="/" aria-label="Yard collection"
         ><span aria-hidden="true">✦</span> YARD</a
       ><span class="header-note">A COLLECTION OF SMALL UNIVERSES</span
-      ><a class="candy-link" href="https://candy-spt.com/"
+      ><a
+        class="candy-link"
+        href="https://candy-spt.com/"
+        aria-label="Septuagint’s home"
         ><span>Septuagint’s home</span><span aria-hidden="true">↗</span></a
       >
     </header>

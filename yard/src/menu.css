@@ -1182,3 +1182,603 @@ h1:hover,
 .chapter-card:not(.is-active) .card-topline {
   opacity: 0;
 }
+
+/* A viewport window onto the orbit: the screen edges crop neighbouring cards. */
+:root {
+  --card-left: clamp(255px, 25vw, 380px);
+  --card-right: clamp(125px, 13.5vw, 205px);
+}
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+body {
+  min-height: 0;
+}
+main {
+  padding: 0;
+  margin: 0;
+  max-width: none;
+}
+.collection {
+  position: static;
+  display: block;
+}
+.gallery-main {
+  display: block;
+}
+.collection-header {
+  position: fixed;
+  inset: 0 0 auto;
+  padding: 25px 28px;
+  z-index: 10;
+  pointer-events: none;
+  max-width: none;
+}
+.collection-header a {
+  pointer-events: auto;
+}
+.header-note {
+  display: none;
+}
+.collection-intro {
+  position: fixed;
+  left: 28px;
+  top: 50%;
+  translate: 0 -50%;
+  width: calc(var(--card-left) - 105px);
+  padding: 0;
+  margin: 0;
+  display: block;
+  z-index: 4;
+  pointer-events: none;
+}
+.collection-intro .eyebrow {
+  font-size: 8px;
+  letter-spacing: 0.15em;
+  gap: 8px;
+}
+.collection-intro .eyebrow > span {
+  width: 16px;
+}
+.collection-intro h1 {
+  font-size: clamp(31px, 3.3vw, 51px);
+  line-height: 1.08;
+}
+.intro-aside {
+  margin-top: 24px;
+  font-size: 10px;
+}
+.card-stage {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  isolation: isolate;
+  overflow: clip;
+  touch-action: none;
+  pointer-events: none;
+  z-index: 2;
+  perspective-origin: calc((100% + var(--card-left) - var(--card-right)) / 2)
+    50%;
+}
+.card-stack {
+  top: calc(50% - var(--card-height) / 2);
+  left: var(--card-left);
+  width: calc(100% - var(--card-left) - var(--card-right));
+  height: var(--card-height);
+  pointer-events: none;
+}
+.chapter-card {
+  pointer-events: auto;
+}
+.card-surface {
+  pointer-events: auto;
+}
+.chapter-card.is-active .card-details {
+  pointer-events: none;
+}
+.chapter-card.is-active .enter-chapter {
+  pointer-events: auto;
+  position: relative;
+  z-index: 8;
+}
+.card-topline {
+  top: 18px;
+  left: 25px;
+  right: 25px;
+}
+.card-content {
+  padding: 50px 25px 0;
+  width: 66%;
+}
+.card-content h2 {
+  font-size: clamp(29px, 3.15vw, 46px);
+}
+.card-eyebrow {
+  font-size: 8px;
+  margin-bottom: 10px;
+}
+.card-description {
+  margin: 12px 0;
+  font-size: 10px;
+  line-height: 1.55;
+  max-width: 285px;
+}
+.enter-chapter {
+  padding: 9px 15px;
+  font-size: 10px;
+  gap: 25px;
+}
+.card-bottomline {
+  bottom: 18px;
+  left: 25px;
+  right: 25px;
+}
+.card-tags > span {
+  font-size: 7px;
+  padding: 4px 6px;
+}
+.art-note {
+  display: none;
+}
+.card-art {
+  width: 59%;
+  top: 0;
+  right: -4%;
+  height: 100%;
+  opacity: 0.9;
+  mask-image: linear-gradient(90deg, transparent, #000 30%);
+}
+.art-index {
+  font-size: 85px;
+  bottom: 13%;
+}
+.chapter-card:not(.is-active) .card-details {
+  opacity: 0.58;
+}
+.side-caption {
+  font-size: 11px;
+  left: 23px;
+  right: 23px;
+}
+.side-caption > span:nth-child(2) {
+  font-size: 16px;
+}
+/* The inward-facing edge is the part visible through the viewport window. */
+.chapter-card[data-side="above"] .side-caption {
+  top: auto;
+  bottom: 18px;
+}
+.chapter-card[data-side="below"] .side-caption {
+  bottom: auto;
+  top: 18px;
+}
+.chapter-card:not(.is-active) .card-bottomline {
+  opacity: 0;
+}
+.chapter-card:not(.is-active) .enter-chapter {
+  visibility: hidden;
+}
+.chapter-card[data-side="below"] .card-content {
+  padding-top: 63px;
+}
+.orbit-controls {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  display: block;
+}
+.orbit-controls .glass-arrow {
+  position: absolute;
+  left: calc(var(--card-left) - 66px);
+  width: 52px;
+  height: 52px;
+  pointer-events: auto;
+}
+.orbit-controls #previous {
+  top: calc(50% - 78px);
+}
+.orbit-controls #next {
+  top: calc(50% + 26px);
+  bottom: auto;
+}
+.chapter-rail {
+  position: fixed;
+  right: 26px;
+  top: 50%;
+  translate: 0 -50%;
+  width: calc(var(--card-right) - 54px);
+  display: block;
+  padding: 0;
+  z-index: 6;
+}
+.thumbnails {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+.thumb-image {
+  height: 64px;
+}
+.thumb-title {
+  font-size: 9px;
+}
+.rail-label {
+  margin-bottom: 20px;
+  display: block;
+}
+.rail-end {
+  margin-top: 20px;
+  display: block;
+}
+.gallery-toolbar {
+  position: fixed;
+  left: 28px;
+  bottom: 80px;
+  width: calc(var(--card-left) - 95px);
+  display: block;
+  margin: 0;
+  padding: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+.browse-hint {
+  display: block;
+  font-size: 9px;
+  line-height: 1.8;
+}
+.browse-hint > span:first-child {
+  display: none;
+}
+.pagination {
+  margin-top: 18px;
+}
+.collection-footer {
+  position: fixed;
+  left: 28px;
+  bottom: 22px;
+  margin: 0;
+  padding: 0;
+  width: calc(var(--card-left) - 85px);
+  z-index: 5;
+  pointer-events: none;
+}
+.collection-footer > span:first-child {
+  display: block;
+  font-size: 8px;
+}
+.collection-footer i,
+.collection-footer > span:last-child {
+  display: none;
+}
+@media (min-height: 850px) and (min-width: 761px) {
+  .card-content {
+    padding-top: 58px;
+  }
+  .card-eyebrow {
+    margin-bottom: 12px;
+  }
+  .card-description {
+    margin: 15px 0;
+    font-size: 11px;
+  }
+  .enter-chapter {
+    padding: 11px 18px;
+  }
+}
+@media (max-height: 760px) and (min-width: 761px) {
+  .card-content {
+    padding-top: 45px;
+  }
+  .card-content h2 {
+    font-size: 34px;
+  }
+  .card-description {
+    font-size: 9px;
+    margin: 9px 0;
+  }
+  .card-eyebrow {
+    font-size: 7px;
+    margin-bottom: 8px;
+  }
+  .card-tags {
+    display: none;
+  }
+  .card-topline {
+    top: 17px;
+    font-size: 7px;
+  }
+  .enter-chapter {
+    padding: 8px 15px;
+  }
+  .collection-intro .intro-aside {
+    margin-top: 18px;
+  }
+}
+@media (max-width: 1000px) and (min-width: 761px) {
+  :root {
+    --card-left: 215px;
+    --card-right: 108px;
+  }
+  .collection-intro {
+    left: 22px;
+    width: 135px;
+  }
+  .collection-intro h1 {
+    font-size: 34px;
+  }
+  .collection-intro .eyebrow {
+    font-size: 7px;
+    letter-spacing: 0.06em;
+  }
+  .collection-intro .eyebrow > span {
+    display: none;
+  }
+  .chapter-rail {
+    right: 15px;
+    width: 70px;
+  }
+  .thumb-image {
+    height: 50px;
+  }
+  .thumb-title {
+    font-size: 8px;
+  }
+  .orbit-controls .glass-arrow {
+    left: calc(var(--card-left) - 56px);
+    width: 45px;
+    height: 45px;
+  }
+  .card-content {
+    width: 73%;
+    padding-left: 20px;
+  }
+  .card-content h2 {
+    font-size: 32px;
+  }
+  .card-topline {
+    left: 20px;
+    right: 20px;
+  }
+  .card-description {
+    max-width: 215px;
+  }
+  .gallery-toolbar {
+    left: 22px;
+    width: 130px;
+  }
+}
+@media (max-width: 760px) {
+  :root {
+    --card-left: 48px;
+    --card-right: 66px;
+  }
+  .collection-header {
+    padding: 0;
+  }
+  .wordmark {
+    position: fixed;
+    top: 18px;
+    left: 11px;
+    writing-mode: vertical-rl;
+    font-size: 12px;
+    gap: 9px;
+  }
+  .wordmark > span {
+    font-size: 24px;
+  }
+  .candy-link {
+    position: fixed;
+    top: 12px;
+    right: 15px;
+    padding: 5px;
+  }
+  .candy-link > span:first-child {
+    display: none;
+  }
+  .collection-intro {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .chapter-card {
+    border-radius: 20px;
+  }
+  .card-topline {
+    left: 17px;
+    right: 17px;
+    top: 16px;
+    font-size: 6px;
+    letter-spacing: 0.1em;
+  }
+  .availability {
+    font-size: 7px;
+  }
+  .card-content {
+    width: 100%;
+    padding: 46px 18px 0;
+  }
+  .card-eyebrow {
+    font-size: 7px;
+    margin-bottom: 9px;
+    letter-spacing: 0.04em;
+  }
+  .card-content h2 {
+    font-size: clamp(24px, 6.8vw, 36px);
+  }
+  .card-description {
+    max-width: 210px;
+    font-size: 9px;
+    line-height: 1.5;
+    margin: 10px 0 12px;
+  }
+  .card-art {
+    top: 15%;
+    height: 86%;
+    width: 100%;
+    right: -24%;
+    opacity: 0.35;
+    mask-image: linear-gradient(90deg, transparent, #000 70%);
+  }
+  .card-tags,
+  .art-index {
+    display: none;
+  }
+  .enter-chapter {
+    padding: 8px 11px;
+    font-size: 10px;
+    gap: 18px;
+  }
+  .coming-note {
+    font-size: 9px;
+    margin-top: 18px;
+  }
+  .orbit-controls .glass-arrow {
+    left: 0;
+    width: 46px;
+    height: 46px;
+    min-width: 46px;
+    min-height: 46px;
+  }
+  .orbit-controls #previous {
+    top: calc(50% - 57px);
+  }
+  .orbit-controls #next {
+    top: calc(50% + 11px);
+  }
+  .chapter-rail {
+    right: 8px;
+    width: 46px;
+  }
+  .thumbnails {
+    grid-template-columns: 1fr;
+    gap: 13px;
+  }
+  .thumb-image {
+    height: 44px;
+    border-radius: 9px;
+  }
+  .thumb-image > span {
+    top: 5px;
+    left: 6px;
+    font-size: 7px;
+  }
+  .thumb-live {
+    bottom: 6px;
+    left: 7px;
+  }
+  .thumb-title,
+  .rail-label,
+  .rail-end {
+    display: none;
+  }
+  .thumbnail::before {
+    left: -6px;
+    top: 13px;
+    bottom: auto;
+    width: 2px;
+    height: 15px;
+    transform: scaleY(0.4);
+  }
+  .thumbnail[aria-current="true"]::before {
+    transform: scaleY(1);
+  }
+  .gallery-toolbar {
+    left: 10px;
+    bottom: 22px;
+    width: 26px;
+  }
+  .browse-hint {
+    display: none;
+  }
+  .pagination {
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    font-size: 8px;
+  }
+  .pagination-line {
+    width: 1px;
+    height: 32px;
+  }
+  .pagination-line i {
+    width: 1px !important;
+    height: 100%;
+  }
+  .collection-footer {
+    display: none;
+  }
+  .side-caption {
+    left: 16px;
+    right: 16px;
+    gap: 8px;
+    padding: 0;
+  }
+  .side-caption > span:first-child {
+    display: none;
+  }
+  .side-caption > span:nth-child(2) {
+    font-size: 12px;
+    line-height: 1.3;
+  }
+  .side-caption > span:last-child {
+    display: none;
+  }
+  .chapter-card[data-side="above"] .side-caption {
+    bottom: 17px;
+  }
+  .chapter-card[data-side="below"] .side-caption {
+    top: 17px;
+  }
+  .chapter-card[data-side="below"] .card-content {
+    padding-top: 45px;
+  }
+}
+@media (max-height: 650px) {
+  .card-description {
+    display: none;
+  }
+  .enter-chapter,
+  .coming-note {
+    margin-top: 13px;
+  }
+  .card-content {
+    padding-top: 39px;
+  }
+  .card-content h2 {
+    font-size: 30px;
+  }
+  .intro-aside {
+    display: none;
+  }
+}
+@media (max-width: 760px) and (max-height: 650px) {
+  .card-content {
+    padding: 36px 15px 0;
+  }
+  .card-content h2 {
+    font-size: 25px;
+  }
+  .card-eyebrow {
+    margin-bottom: 6px;
+    font-size: 6px;
+  }
+  .card-topline {
+    left: 15px;
+    right: 15px;
+    top: 13px;
+    font-size: 6px;
+  }
+  .availability {
+    display: none;
+  }
+  .enter-chapter {
+    margin-top: 12px;
+    font-size: 9px;
+  }
+}
