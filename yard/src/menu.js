@@ -1,5 +1,8 @@
 import { chapters } from "./chapters.js";
 import { createMenuGlass } from "./menu-glass.js";
+import { createRingNavigator } from "./ring-navigation.js";
+import { createGlassArrows } from "./glass-arrows.js";
+import "./interaction.css";
 
 const stage = document.querySelector("#card-stage");
 const stack = document.querySelector("#cards");
@@ -40,134 +43,142 @@ rail.innerHTML = chapters
   .join("");
 const cards = [...stack.children];
 const thumbs = [...rail.querySelectorAll("button")];
+const glassArrows = createGlassArrows({
+  source: () => document.querySelector("#glass-world"),
+  onInvalidate: () => glass.invalidate(),
+  buttons: [...document.querySelectorAll(".glass-arrow")],
+  reducedMotion: motion.matches,
+});
 const glass = createMenuGlass({
   background: document.querySelector("#glass-world"),
+  onRender: () => glassArrows.render(),
   surfaces: cards.map((element) => ({
     element,
     canvas: element.querySelector("canvas"),
   })),
   reducedMotion: motion.matches,
 });
-const keys = ["y", "x", "scale", "rx", "ry", "rz"];
-const states = cards.map(() => ({
-  value: { y: 0, x: 0, scale: 1, rx: 0, ry: 0, rz: 0 },
-  speed: Object.fromEntries(keys.map((k) => [k, 0])),
-}));
-let selected = 0,
-  frame = 0,
-  previousTime = 0,
-  start = null;
-let pointer = { x: 0, y: 0 },
-  peek = { top: 0, bottom: 0 },
-  focusedSide = 0;
+// The index and Chapter 01 share the same directional navigation model.
+// Compression only changes the spacing: every card still follows one Y/Z circle.
+const TAU = Math.PI * 2;
+const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+const pointer = { x: 0, y: 0 };
+const tilt = { x: 0, y: 0 };
+let frame = 0;
+let previousTime = 0;
+let start = null;
+let focusedSide = 0;
+let geometry;
+const navigator = createRingNavigator({
+  count: chapters.length,
+  initial: 0,
+  previewAngle: 0.38,
+  stiffness: 92,
+  damping: 18.5,
+  reducedMotion: motion.matches,
+  onChange: () => updateSelection(),
+});
 document.querySelector("#page-total").textContent = String(
   chapters.length,
 ).padStart(2, "0");
-const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
-function sideFor(i) {
-  if (i === selected) return 0;
-  if (i === (selected - 1 + cards.length) % cards.length) return -1;
-  if (i === (selected + 1) % cards.length) return 1;
-  return null;
+
+function projectEdges(angle, radius, perspective, height) {
+  const y = radius * Math.sin(angle);
+  const z = radius * (Math.cos(angle) - 1);
+  return [-height / 2, height / 2].map(
+    (edge) =>
+      (perspective * (y + edge * Math.cos(angle))) /
+      (perspective - z - edge * Math.sin(angle)),
+  );
 }
-function targets(i) {
-  const side = sideFor(i),
-    h = stack.clientHeight;
-  const reveal = side < 0 ? peek.top : peek.bottom;
-  return side
-    ? {
-        y: side * h * (0.054 + 0.224 * reveal),
-        x: side * 4,
-        scale: 0.962,
-        rx: -side * (1.2 + reveal * 1.7),
-        ry: pointer.x * 1.2,
-        rz: side * 0.35,
-      }
-    : {
-        y: pointer.y * 5,
-        x: pointer.x * 7,
-        scale: 1,
-        rx: -pointer.y * 4,
-        ry: pointer.x * 5,
-        rz: 0,
-      };
+function orbitalAngle(logical) {
+  return 2 * Math.atan(geometry.compression * Math.tan(logical / 2));
 }
-function paint() {
-  states.forEach((s, i) => {
-    const v = s.value,
-      el = cards[i];
-    el.style.transform = `translate3d(${v.x}px,${v.y}px,0) rotateX(${v.rx}deg) rotateY(${v.ry}deg) rotateZ(${v.rz}deg) scale(${v.scale})`;
-    el.style.setProperty("--rx", v.rx);
-    el.style.setProperty("--ry", v.ry);
-    el.style.setProperty("--tx", `${v.x}px`);
-    el.style.setProperty("--ty", `${v.y}px`);
-    el.style.setProperty("--shine-x", `${50 + pointer.x * 30}%`);
-    el.style.setProperty("--shine-y", `${50 + pointer.y * 30}%`);
-  });
-  glass.invalidate();
-}
-function animate(now) {
-  frame = 0;
-  if (document.hidden) return;
-  const dt = Math.min((now - previousTime) / 1000 || 0.016, 0.032);
-  previousTime = now;
-  let moving = false;
-  states.forEach((s, i) => {
-    const desired = targets(i);
-    keys.forEach((key) => {
-      if (motion.matches) {
-        s.value[key] = desired[key];
-        s.speed[key] = 0;
-        return;
-      }
-      s.speed[key] +=
-        ((desired[key] - s.value[key]) * 190 - s.speed[key] * 23) * dt;
-      s.value[key] += s.speed[key] * dt;
-      if (
-        Math.abs(s.speed[key]) > 0.015 ||
-        Math.abs(desired[key] - s.value[key]) > 0.005
-      )
-        moving = true;
-    });
-  });
-  paint();
-  if (moving) frame = requestAnimationFrame(animate);
-}
-function invalidate() {
-  if (!frame && !document.hidden) {
-    previousTime = performance.now();
-    frame = requestAnimationFrame(animate);
+function measure() {
+  const height = stack.clientHeight;
+  const radius = Math.max(innerHeight * 0.82, height * 1.6);
+  const perspective = radius * 4;
+  // Solve for 66% visible neighbour area instead of guessing a CSS offset.
+  let low = 0.01,
+    high = 1.25;
+  for (let iteration = 0; iteration < 28; iteration++) {
+    const theta = (low + high) * 0.5;
+    const [top, bottom] = projectEdges(theta, radius, perspective, height);
+    if ((bottom - height / 2) / (bottom - top) > 0.66) high = theta;
+    else low = theta;
   }
-}
-function rest() {
-  pointer = { x: 0, y: 0 };
-  peek = { top: focusedSide < 0 ? 1 : 0, bottom: focusedSide > 0 ? 1 : 0 };
+  const step = TAU / chapters.length;
+  geometry = {
+    height,
+    radius,
+    perspective,
+    compression: Math.tan((low + high) / 4) / Math.tan(step / 2),
+    preview: 0,
+  };
+  // Pointer travel is calibrated to 90% exposure at the approached edge.
+  low = 0;
+  high = Math.min(0.38, Math.PI - step - 0.02);
+  for (let iteration = 0; iteration < 28; iteration++) {
+    const offset = (low + high) * 0.5;
+    const near = projectEdges(
+      orbitalAngle(-step - offset),
+      radius,
+      perspective,
+      height,
+    );
+    const front = projectEdges(
+      orbitalAngle(-offset),
+      radius,
+      perspective,
+      height,
+    );
+    if ((front[0] - near[0]) / (near[1] - near[0]) > 0.9) high = offset;
+    else low = offset;
+  }
+  geometry.preview = (low + high) * 0.5;
+  const reach = Math.max(
+    ...projectEdges(
+      orbitalAngle(step + geometry.preview),
+      radius,
+      perspective,
+      height,
+    ).map(Math.abs),
+  );
+  // Reserve the full approached orbit, including the mobile triangle controls.
+  stage.style.height = `${Math.ceil(reach * 2 + (innerWidth <= 760 ? 112 : 32))}px`;
+  stage.style.perspective = `${perspective}px`;
+  stage.dataset.orbitDiameter = (radius * 2).toFixed(1);
+  stage.dataset.neighbourExposure = "0.66";
+  stage.dataset.edgeExposure = "0.90";
+  applyPreview();
   invalidate();
 }
-function select(index, announce = true, initial = false) {
-  selected = (index + chapters.length) % chapters.length;
-  focusedSide = 0;
-  pointer = { x: 0, y: 0 };
-  peek = { top: 0, bottom: 0 };
+function applyPreview() {
+  if (!geometry) return;
+  const y = focusedSide || pointer.y;
+  const edge = clamp(Math.abs(y), 0, 1);
+  const progressive = edge * edge * (3 - 2 * edge);
+  navigator.setPreview(
+    motion.matches
+      ? 0
+      : (-Math.sign(y) * progressive * geometry.preview) / 0.38,
+  );
+}
+function updateSelection(announce = true) {
+  const selected = navigator.index;
   cards.forEach((card, i) => {
-    const side = sideFor(i),
-      active = side === 0;
-    card.hidden = side === null;
+    const active = i === selected;
     card.classList.toggle("is-active", active);
-    card.dataset.side = side < 0 ? "above" : side > 0 ? "below" : "front";
-    card.style.zIndex = active ? "3" : "1";
     const details = card.querySelector(".card-details");
     details.inert = !active;
     details.setAttribute("aria-hidden", String(!active));
     const button = card.querySelector(".side-select");
     button.hidden = active;
     button.inert = active;
-    button.querySelector(".side-direction").textContent =
-      side < 0 ? "↑ PREVIOUS" : "↓ NEXT";
     thumbs[i].setAttribute("aria-current", String(active));
-    if (initial) states[i].value = targets(i);
   });
   document.body.dataset.accent = chapters[selected].accent;
+  stage.dataset.selected = String(selected);
   document.querySelector("#page-current").textContent = chapters[selected].id;
   document.querySelector("#page-progress").style.width =
     `${((selected + 1) / chapters.length) * 100}%`;
@@ -176,60 +187,130 @@ function select(index, announce = true, initial = false) {
       `Chapter ${chapters[selected].id}: ${chapters[selected].shortTitle}. ${chapters[selected].status}.`;
   invalidate();
 }
-thumbs.forEach((b, i) => b.addEventListener("click", () => select(i)));
-cards.forEach((card, i) => {
+function paint() {
+  if (!geometry) return;
+  cards.forEach((card, i) => {
+    const logical = navigator.angle(i);
+    const angle = orbitalAngle(logical);
+    const y = geometry.radius * Math.sin(angle);
+    const z = geometry.radius * (Math.cos(angle) - 1);
+    const pitch = (angle * 180) / Math.PI + tilt.y * -1.6;
+    const active = i === navigator.index;
+    const front = Math.abs(angle) < Math.PI * 0.56;
+    const direction = logical < 0 ? -1 : 1;
+    card.style.transform = `translate3d(${tilt.x * 3}px,${y}px,${z}px) rotateX(${pitch}deg) rotateY(${tilt.x * 2.2}deg)`;
+    card.style.zIndex = String(1000 + Math.round(z));
+    card.style.visibility = front ? "visible" : "hidden";
+    card.dataset.side = active ? "front" : direction < 0 ? "above" : "below";
+    card.dataset.direction = String(direction);
+    card.dataset.orbitAngle = angle.toFixed(4);
+    card.style.setProperty("--rx", pitch);
+    card.style.setProperty("--ry", tilt.x * 2.2);
+    card.style.setProperty("--tx", `${tilt.x * 3}px`);
+    card.style.setProperty("--ty", `${tilt.y * 3}px`);
+    card.style.setProperty("--shine-x", `${50 + pointer.x * 38}%`);
+    card.style.setProperty("--shine-y", `${50 + pointer.y * 38}%`);
+    card.querySelector(".side-direction").textContent =
+      direction < 0 ? "PREVIOUS CHAPTER" : "NEXT CHAPTER";
+  });
+  glass.invalidate();
+}
+function animate(now) {
+  frame = 0;
+  if (document.hidden) return;
+  const dt = Math.min((now - previousTime) / 1000 || 0.016, 0.032);
+  previousTime = now;
+  const moving = navigator.update(dt);
+  const blend = motion.matches ? 1 : 1 - Math.exp(-9 * dt);
+  tilt.x += ((motion.matches ? 0 : pointer.x) - tilt.x) * blend;
+  tilt.y += ((motion.matches ? 0 : pointer.y) - tilt.y) * blend;
+  paint();
+  if (
+    moving ||
+    Math.abs(tilt.x - pointer.x) + Math.abs(tilt.y - pointer.y) > 0.002
+  )
+    frame = requestAnimationFrame(animate);
+}
+function invalidate() {
+  if (!frame && !document.hidden) {
+    previousTime = performance.now();
+    frame = requestAnimationFrame(animate);
+  }
+}
+function rest() {
+  pointer.x = pointer.y = 0;
+  applyPreview();
+  invalidate();
+}
+function step(direction) {
+  navigator.step(direction);
+  applyPreview();
+  invalidate();
+}
+thumbs.forEach((button, i) =>
+  button.addEventListener("click", () => {
+    navigator.select(i);
+    invalidate();
+  }),
+);
+cards.forEach((card) => {
   const button = card.querySelector(".side-select");
   button.addEventListener("click", () => {
-    select(i);
+    // A visible neighbour is a direction, never an arbitrary destination.
+    step(Number(card.dataset.direction));
     stage.focus({ preventScroll: true });
   });
   button.addEventListener("focus", () => {
-    focusedSide = sideFor(i);
-    peek = { top: focusedSide < 0 ? 1 : 0, bottom: focusedSide > 0 ? 1 : 0 };
+    focusedSide = Number(card.dataset.direction);
+    applyPreview();
     invalidate();
   });
   button.addEventListener("blur", () => {
     focusedSide = 0;
-    rest();
+    applyPreview();
+    invalidate();
   });
 });
-document
-  .querySelector("#previous")
-  .addEventListener("click", () => select(selected - 1));
-document
-  .querySelector("#next")
-  .addEventListener("click", () => select(selected + 1));
+document.querySelector("#previous").addEventListener("click", () => step(-1));
+document.querySelector("#next").addEventListener("click", () => step(1));
 document.querySelector(".collection").addEventListener("keydown", (event) => {
   if (event.altKey || event.ctrlKey || event.metaKey) return;
-  const indices = {
-    ArrowLeft: selected - 1,
-    ArrowRight: selected + 1,
-    ArrowUp: selected - 1,
-    ArrowDown: selected + 1,
-    Home: 0,
-    End: chapters.length - 1,
-  };
-  if (!(event.key in indices)) return;
+  const direction = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -1, ArrowDown: 1 }[
+    event.key
+  ];
+  if (!direction && !["Home", "End"].includes(event.key)) return;
   event.preventDefault();
   const fromThumb = !!document.activeElement?.closest(".thumbnail");
   const fromCard = !!document.activeElement?.closest(".chapter-card");
-  select(indices[event.key]);
-  if (fromThumb) thumbs[selected].focus();
+  if (direction) step(direction);
+  else navigator.select(event.key === "Home" ? 0 : chapters.length - 1);
+  if (fromThumb) thumbs[navigator.index].focus();
   else if (fromCard) stage.focus({ preventScroll: true });
+  invalidate();
 });
 stage.addEventListener("pointermove", (event) => {
-  if (event.pointerType === "touch" || !finePointer.matches || start) return;
-  const r = stack.getBoundingClientRect();
-  const y = (event.clientY - r.top - r.height / 2) / (r.height / 2);
-  const t = clamp((Math.abs(y) - 0.28) / 0.73, 0, 1),
-    curve = t * t * (3 - 2 * t);
-  peek = { top: y < 0 ? curve : 0, bottom: y > 0 ? curve : 0 };
-  // Keep entry targets still while hovered; side cards can continue expanding.
-  if (!motion.matches && !event.target.closest("a,button"))
-    pointer = {
-      x: clamp((event.clientX - r.left - r.width / 2) / (r.width / 2), -1, 1),
-      y: clamp(y, -1, 1),
-    };
+  if (
+    event.pointerType === "touch" ||
+    !finePointer.matches ||
+    start ||
+    motion.matches
+  )
+    return;
+  // Holding a live hit target steady avoids links sliding out from under a click.
+  if (event.target.closest("a,button") && !event.target.closest(".side-select"))
+    return;
+  const bounds = stack.getBoundingClientRect();
+  pointer.x = clamp(
+    (event.clientX - bounds.left - bounds.width / 2) / (bounds.width / 2),
+    -1,
+    1,
+  );
+  pointer.y = clamp(
+    (event.clientY - bounds.top - bounds.height / 2) / (bounds.height * 0.8),
+    -1,
+    1,
+  );
+  applyPreview();
   invalidate();
 });
 stage.addEventListener("pointerleave", rest);
@@ -247,7 +328,6 @@ stage.addEventListener("pointerdown", (event) => {
     type: event.pointerType,
   };
   stage.setPointerCapture(event.pointerId);
-  rest();
 });
 stage.addEventListener("pointerup", (event) => {
   if (!start || event.pointerId !== start.id) return;
@@ -255,10 +335,12 @@ stage.addEventListener("pointerup", (event) => {
     dy = event.clientY - start.y,
     type = start.type;
   start = null;
-  if (type !== "touch" && Math.abs(dy) > 50 && Math.abs(dy) > Math.abs(dx))
-    select(selected + (dy < 0 ? 1 : -1));
-  else if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.25)
-    select(selected + (dx < 0 ? 1 : -1));
+  if (stage.hasPointerCapture(event.pointerId))
+    stage.releasePointerCapture(event.pointerId);
+  if (type !== "touch" && Math.abs(dy) > 45 && Math.abs(dy) > Math.abs(dx))
+    step(dy < 0 ? 1 : -1);
+  else if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.25)
+    step(dx < 0 ? 1 : -1);
 });
 stage.addEventListener("pointercancel", () => {
   start = null;
@@ -274,20 +356,33 @@ stage.addEventListener(
   "wheel",
   (event) => {
     if (
-      Math.abs(event.deltaX) <= Math.abs(event.deltaY) ||
-      Math.abs(event.deltaX) < 2
+      event.ctrlKey ||
+      Math.max(Math.abs(event.deltaY), Math.abs(event.deltaX)) < 1
+    )
+      return;
+    // On short windows the orbit is taller than the viewport. Let the page
+    // bring the focused card fully into view before the wheel controls it.
+    const focusedBounds = cards[navigator.index].getBoundingClientRect();
+    if (
+      Math.abs(event.deltaY) >= Math.abs(event.deltaX) &&
+      (focusedBounds.top < 48 || focusedBounds.bottom > innerHeight - 24)
     )
       return;
     event.preventDefault();
     const now = performance.now();
     if (now < wheelLockedUntil) return;
-    if (now - wheelTime > 220) wheelTotal = 0;
+    if (now - wheelTime > 180) wheelTotal = 0;
     wheelTime = now;
-    wheelTotal += event.deltaX;
-    if (Math.abs(wheelTotal) > 60) {
-      select(selected + (wheelTotal > 0 ? 1 : -1));
+    const unit =
+      event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? innerHeight : 1;
+    wheelTotal +=
+      (Math.abs(event.deltaY) >= Math.abs(event.deltaX)
+        ? event.deltaY
+        : event.deltaX) * unit;
+    if (Math.abs(wheelTotal) > 42) {
+      step(wheelTotal > 0 ? 1 : -1);
       wheelTotal = 0;
-      wheelLockedUntil = now + 600;
+      wheelLockedUntil = now + 650;
     }
   },
   { passive: false },
@@ -301,9 +396,12 @@ window.addEventListener("blur", () => {
   start = null;
   rest();
 });
-window.addEventListener("resize", invalidate, { passive: true });
+window.addEventListener("resize", measure, { passive: true });
 motion.addEventListener("change", () => {
+  navigator.setReducedMotion(motion.matches);
   glass.setReducedMotion(motion.matches);
+  glassArrows.setReducedMotion(motion.matches);
   rest();
 });
-select(0, false, true);
+measure();
+updateSelection(false);

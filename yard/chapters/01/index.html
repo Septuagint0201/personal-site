@@ -4,13 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#d5e2e6" />
-    <meta name="description" content="Chapter 01 of YARD: an interactive world of glass, three light atmospheres, material studies, and hidden discoveries." />
+    <meta name="description" content="Chapter 01 of YARD: three crystalline sculptures sharing one orbit, moonlit glass, tactile material studies, and hidden discoveries." />
     <title>Chapter 01 — Light, in a different state · YARD</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23080b13'/%3E%3Cpath d='M32 9 37 27 55 32 37 37 32 55 27 37 9 32 27 27Z' fill='%23dfedf6'/%3E%3C/svg%3E" />
   </head>
   <body>
     <main class="experience" aria-label="Yard optical playground">
-      <div id="stage" tabindex="0" aria-label="Interactive glass sculpture. Drag to orbit, click to resonate. Keyboard controls in How to play."></div>
+      <div id="stage" tabindex="0" aria-label="Interactive glass collection. Drag the room to look around; drag the focused glass to turn it. Scroll or press Left and Right to switch studies. A and D turn the view."></div>
       <div class="vignette" aria-hidden="true"></div>
 
       <div class="interface">
@@ -33,13 +33,14 @@
           <p class="eyebrow"><span aria-hidden="true"></span> Chapter 01 · An optical playground</p>
           <h1 id="headline">Light,<br />in a different<br /><em>state.</em></h1>
           <p class="intro-copy">A small universe of glass.<br /> Yours to disturb.</p>
-          <div class="atmosphere-picker" role="group" aria-label="Light atmosphere">
-            <button type="button" data-atmosphere="daybreak" aria-pressed="false"><span class="atmosphere-dot daybreak" aria-hidden="true"></span>Daybreak</button>
-            <button type="button" data-atmosphere="moonlight" aria-pressed="true"><span class="atmosphere-dot moonlight" aria-hidden="true"></span>Moonlight</button>
-            <button type="button" data-atmosphere="aurora" aria-pressed="false"><span class="atmosphere-dot aurora" aria-hidden="true"></span>Aurora</button>
-          </div>
-          <p class="interaction-hint"><span>Drag to orbit</span><i aria-hidden="true">·</i><span>Scroll to explore</span><i aria-hidden="true">·</i><span>Touch the glass</span></p>
+          <p class="interaction-hint"><span>Drag the room to look around</span><i aria-hidden="true">·</i><span>Scroll to switch</span></p>
         </section>
+
+        <nav class="study-orbit-navigation" aria-label="Move around the glass collection">
+          <button type="button" class="glass-arrow study-arrow" data-direction="left" aria-label="Previous glass study" title="Previous study · Left arrow"><canvas class="arrow-glass" aria-hidden="true"></canvas></button>
+          <button type="button" class="glass-arrow study-arrow" data-direction="right" aria-label="Next glass study" title="Next study · Right arrow"><canvas class="arrow-glass" aria-hidden="true"></canvas></button>
+        </nav>
+        <p class="look-around-hint">Three works, one orbit. <span>Drag the empty room to discover what is behind you.</span></p>
 
         <div class="specimen-note" aria-hidden="true"><span>REAL-TIME LIGHT STUDIES</span><span>EST. 2026</span></div>
 
@@ -48,14 +49,7 @@
         </button>
 
         <section id="controls" class="controls" aria-label="Sculpture controls">
-          <div class="scene-picker">
-            <span class="control-label">Choose a study</span>
-            <div class="scene-switcher" role="group" aria-label="Glass study">
-              <button class="scene-button is-active" type="button" data-scene="prism" aria-pressed="true"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m10 2 7 13-7 3-7-3 7-13Z" stroke="currentColor" stroke-width="1.1"/><path d="m10 2 1 11 6 2m-6-2-8 2m8-2-1 5" stroke="currentColor" stroke-width=".8"/></svg><span>Prism</span></button>
-              <button class="scene-button" type="button" data-scene="halo" aria-pressed="false"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><ellipse cx="10" cy="10" rx="5.7" ry="8" transform="rotate(35 10 10)" stroke="currentColor" stroke-width="1.1"/><ellipse cx="10" cy="10" rx="2.8" ry="5.7" transform="rotate(35 10 10)" stroke="currentColor" stroke-width=".8"/></svg><span>Halo</span></button>
-              <button class="scene-button" type="button" data-scene="orbit" aria-pressed="false"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="2.4" stroke="currentColor" stroke-width="1.1"/><ellipse cx="10" cy="10" rx="8" ry="4" transform="rotate(-35 10 10)" stroke="currentColor" stroke-width="1.1"/><circle cx="15.5" cy="5.6" r="1.4" fill="currentColor"/></svg><span>Orbit</span></button>
-            </div>
-          </div>
+          <p class="control-summary">MOONLIGHT <span>Drag the glass to turn its facets.</span></p>
           <div class="control-field">
             <div class="range-heading"><label class="control-label" for="light">Light intensity</label><output id="light-value" for="light">65%</output></div>
             <input id="light" type="range" min="0" max="100" value="65" aria-label="Light intensity" />
@@ -75,7 +69,7 @@
         </section>
 
         <footer class="experience-footer">
-          <p id="scene-caption" class="scene-caption">01 — PRISM STUDY</p>
+          <p id="scene-caption" class="scene-caption" aria-live="polite" aria-atomic="true">01 — PRISM STUDY</p>
           <button id="collection-toggle" class="discovery-status" type="button" aria-controls="help-dialog"><span class="discovery-symbol" aria-hidden="true">✧</span><span id="secret-count">0 / 3 discoveries</span><span class="collection-arrow" aria-hidden="true">↗</span></button>
           <p class="quality-status"><span class="live-dot" aria-hidden="true"></span><span id="quality-label">LIVE · INTERACTIVE</span></p>
         </footer>
@@ -110,12 +104,12 @@
         <section id="panel-studies" class="notes-panel" role="tabpanel" aria-labelledby="tab-studies" tabindex="0">
           <p class="notes-caption" id="study-index">STUDY 01 / 03</p>
           <h3 id="study-name">Prism study</h3>
-          <p class="notes-copy" id="study-description">Twenty faces, one borrowed sky. Each edge divides the room into a different reflection. Move closer to see the filament bend through the glass.</p>
+          <p class="notes-copy" id="study-description">Twenty faces, one borrowed sky. Each edge divides the room into a different reflection. Drag the crystal itself to bring a new facet into the moonlight.</p>
           <dl class="material-stats"><div><dt>Form</dt><dd id="study-form">Icosahedron</dd></div><div><dt>Refraction</dt><dd>1.50 IOR</dd></div><div><dt>Character</dt><dd id="study-character">Faceted / crystalline</dd></div></dl>
           <p class="observation"><span>TRY THIS</span><span id="study-prompt">Turn down the light, then move the cursor slowly across a facet. Watch the edges hold onto the last glimmer.</span></p>
           <button id="paths-toggle" class="paths-toggle" type="button" aria-pressed="false"><span aria-hidden="true">⤳</span><span>Show light paths</span></button>
           <p class="path-note">A drawn spectrum through the room. Close these notes to explore it in 3D.</p>
-          <div class="study-navigation" role="group" aria-label="Read a material study"><button data-scene="prism" type="button" aria-pressed="true">01 · Prism</button><button data-scene="halo" type="button" aria-pressed="false">02 · Halo</button><button data-scene="orbit" type="button" aria-pressed="false">03 · Orbit</button></div>
+
         </section>
         <section id="panel-discoveries" class="notes-panel" role="tabpanel" aria-labelledby="tab-discoveries" tabindex="0" hidden>
           <p class="notes-copy collection-intro">Small rewards for staying curious. Your collection stays in this browser; each discovery can be experienced again.</p>
@@ -128,17 +122,19 @@
         <section id="panel-guide" class="notes-panel" role="tabpanel" aria-labelledby="tab-guide" tabindex="0" hidden>
         <p class="help-lead">Nothing here is quite still. Make yourself part of the experiment.</p>
         <dl class="gesture-guide">
-          <div><dt>Move around</dt><dd>Drag to orbit. Scroll or pinch to move closer.</dd></div>
+          <div><dt>Look around</dt><dd>Drag the empty room to turn your head. Two waiting sculptures stand behind you, on the same circular track.</dd></div>
+          <div><dt>Change study</dt><dd>Scroll, press Left or Right, or touch a glass triangle. Touch a waiting sculpture to move one place in its screen direction.</dd></div>
+          <div><dt>Turn the glass</dt><dd>Drag the focused sculpture to rotate its facets. Release it to keep a little momentum. Reset view brings the arch back.</dd></div>
           <div><dt>Make a ripple</dt><dd>Touch the glass or send a pulse through the scene.</dd></div>
-          <div><dt>Change the light</dt><dd>Choose Daybreak, Moonlight, or Aurora. Explore three studies and adjust intensity and dispersion.</dd></div>
+          <div><dt>Shape the light</dt><dd>Stay in moonlight. Adjust intensity and dispersion, or open the drawn light paths to study the glass.</dd></div>
         </dl>
         <div class="keyboard-guide" aria-label="Keyboard shortcuts">
-          <p><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd><span>Orbit</span></p>
+          <p><kbd>←</kbd><kbd>→</kbd><span>Previous / next study</span></p>
+          <p><kbd>A</kbd><kbd>D</kbd><span>Look left / right</span></p>
+          <p><kbd>↑</kbd><kbd>↓</kbd><span>Look up / down</span></p>
           <p><kbd>Space</kbd><span>Pause</span></p>
           <p><kbd>P</kbd><span>Pulse</span></p>
-          <p><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><span>Studies</span></p>
           <p><kbd>R</kbd><span>Reset</span></p>
-          <p><kbd>L</kbd><span>Light atmosphere</span></p>
           <p><kbd>T</kbd><span>Light paths</span></p>
           <p><kbd>?</kbd><span>This guide</span></p>
           <p class="keyboard-hold"><kbd>G</kbd><span>Hold G to hold the glass.</span></p>

@@ -49,9 +49,9 @@ vec3 gallery(vec2 pixel) {
   float fin = p.x + p.y * .13;
   float f = fract(fin * 8.);
   float wall = 1. - smoothstep(.69, .88, p.y);
-  c *= 1. - .055 * (1. - smoothstep(0., .29, f)) * wall;
-  c += vec3(.16, .18, .18) * line((f - .01) * viewport.x / 8., .55) * wall;
-  c -= vec3(.05, .06, .07) * line((f - .024) * viewport.x / 8., .6) * wall;
+  c *= 1. - .14 * (1. - smoothstep(0., .29, f)) * wall;
+  c += vec3(.19, .21, .21) * line((f - .01) * viewport.x / 8., .55) * wall;
+  c -= vec3(.13, .14, .15) * line((f - .024) * viewport.x / 8., .6) * wall;
 
   // A large suspended annulus. Its coloured, crisp contours make refraction legible.
   vec2 centre = vec2(.77 * aspect, .42 + drift);
@@ -87,6 +87,10 @@ vec3 gallery(vec2 pixel) {
   floorColour -= .04 * (1. - smoothstep(.003, .009, rows));
   floorColour += vec3(.05, .06, .065) * pow(max(0., sin(p.x * 20. + p.y * 9.)), 18.);
   c = mix(c, floorColour, floorMask * .72);
+  // Broad translucent architectural leaves echo the homepage strata composition.
+  float leaf = smoothstep(.19, .193, p.x + p.y * .18) * (1. - smoothstep(.41, .415, p.x + p.y * .18));
+  c = mix(c, vec3(.53, .72, .73), leaf * .14);
+  c += vec3(.17, .14, .13) * line((p.x + p.y * .18 - .193) * viewport.x, 1.2);
 
   // Gentle prismatic pools and caustic filaments, never a blank dark field.
   vec2 causticP = q - vec2(.94 * aspect, .9);
@@ -131,44 +135,48 @@ void main() {
   ) + vec2(.00001));
 
   float inward = max(-d, 0.);
-  float bevelWidth = min(23., min(size.x, size.y) * .085);
-  float bevel = 1. - smoothstep(1., bevelWidth, inward);
-  float internalRim = exp(-squared((inward - bevelWidth * .61) / 2.4));
-  vec2 bowed = p / max(size.x, size.y);
-  vec3 normal = normalize(vec3(gradient * bevel * 1.85 + bowed * .18 + tilt * .025, 1.));
-  float thickness = 42. + 26. * (1. - bevel);
+  // The homepage's polished strata reflection and smooth C2 shoulder are used
+  // together here: a continuous lens cap, not a stack of painted white borders.
+  float depth = 60.;
+  float bevel = min(9. + depth * .32, min(size.x, size.y) * .35);
+  float referenceWidth = min(bevel * 1.75, min(size.x, size.y) * .46);
+  float width = min(bevel * 2.4, min(size.x, size.y) * .485);
+  float t = clamp(inward / max(width, 1.), 0., 1.);
+  float widthRatio = width / max(referenceWidth, .001);
+  float b = 1. / (1.1 * widthRatio * (1. + 1. / .85) - 1.);
+  float q = (1. + b) * t / (t + b);
+  float tail = max(1. - q, 0.);
+  float height = 1. - tail * tail * tail;
+  float derivative = 3. * tail * tail * b * (1. + b) / squared(t + b);
+  float slope = depth * .82 * derivative / max(width, 1.);
+  vec3 normal = normalize(vec3(gradient * slope, 1.));
+  float thickness = depth * (.18 + .82 * height);
 
-  vec2 red = refraction(normal, 1.478, thickness);
-  vec2 green = refraction(normal, 1.51, thickness);
-  vec2 blue = refraction(normal, 1.556, thickness);
-  // Reversing a narrow inner bevel yields the second highlight of a solid slab.
-  float innerLens = exp(-squared((inward - bevelWidth * 1.03) / 5.));
-  vec2 correction = gradient * innerLens * 4.;
-  red += correction;
-  green += correction;
-  blue += correction;
+  vec2 red = refraction(normal, 1.41, thickness);
+  vec2 green = refraction(normal, 1.48, thickness);
+  vec2 blue = refraction(normal, 1.55, thickness);
+  // Sampling the same gallery makes the line displacement visible through every slab.
   vec3 transmitted = vec3(gallery(pixel + red).r, gallery(pixel + green).g, gallery(pixel + blue).b);
-
-  vec3 glassTint = mix(vec3(.93, .986, 1.), vec3(1., .957, .942), accent);
-  transmitted *= pow(glassTint, vec3(.55 + bevel * 1.2));
-  float fresnel = .045 + .4 * pow(1. - normal.z, 2.5);
-  vec2 reflectedPixel = pixel + normal.xy * viewport * .3 + vec2(0., -viewport.y * .15);
+  vec3 glassTint = accent > 1.5 ? vec3(.89, .99, .94) :
+    mix(vec3(.94, .986, 1.), vec3(1., .915, .88), accent);
+  transmitted *= pow(glassTint, vec3(.55 + tail * 1.1));
+  vec3 incident = normalize(vec3(tilt * .045, -1.));
+  vec3 reflected = reflect(incident, normal);
+  float fresnel = .04 + .96 * pow(1. - max(dot(-incident, normal), 0.), 5.);
+  float softbox = exp(-squared((reflected.x + reflected.y * .65 - .35) * 3.4));
+  float strip = exp(-squared((reflected.x - reflected.y * .3 + .55) * 15.));
+  vec2 reflectedPixel = pixel + reflected.xy * viewport * .3 + vec2(0., -viewport.y * .15);
   vec3 reflection = gallery(reflectedPixel);
-  vec3 colour = mix(transmitted, reflection, fresnel);
-
-  // Broad upper softbox and a travelling razor of light on the polished cut edge.
-  vec3 lamp = normalize(vec3((light - .5) * vec2(1.4, -1.4), 1.5));
-  vec3 halfVector = normalize(lamp + vec3(0., 0., 1.));
-  float specular = pow(max(0., dot(normal, halfVector)), 85.);
-  float edgeLight = max(0., dot(gradient, normalize(vec2(-.5, -.86))));
-  float outerRim = exp(-squared((inward - 1.4) / 1.3));
-  float spectralRim = internalRim * (.16 + .35 * bevel);
-  vec3 spectral = spectrum(atan(gradient.y, gradient.x) / 6.28318 + localUV.x * .15 + time * .006);
-  colour += vec3(.15, .16, .16) * specular * (.15 + bevel * .85);
-  colour += vec3(.44, .47, .45) * outerRim * (.2 + edgeLight * .8);
-  colour += spectral * spectralRim * .35;
-  colour -= vec3(.09, .08, .055) * internalRim * (1. - edgeLight) * .6;
-  colour += vec3(.02, .027, .029) * pow(1. - localUV.y, 5.);
+  vec3 colour = mix(transmitted, reflection, fresnel * .72);
+  float rim = exp(-abs(d + .7) * 1.7);
+  vec2 lightDirection = normalize((light * viewport - pixel) + vec2(.01));
+  float directional = .22 + .78 * max(dot(gradient, lightDirection), 0.);
+  vec3 lamp = normalize(vec3((light * viewport - pixel) / viewport, .65));
+  float sheen = pow(max(dot(normal, normalize(lamp + vec3(0., 0., 1.))), 0.), 40.);
+  vec3 lighting = vec3(.82, .88, 1.) * (softbox * .065 + strip * .11 + fresnel * .23 + rim * directional * .31);
+  colour += lighting + vec3(.94, .98, 1.) * sheen * .055;
+  colour -= tail * tail * tail * (1. - directional) * .14;
+  // A narrow reflected spectrum comes from changing ray IOR, without a rainbow border.
   gl_FragColor = vec4(clamp(colour, 0., 1.), alpha);
 }`;
 
@@ -191,7 +199,7 @@ function createPass(canvas, isSurface) {
     depth: false,
     stencil: false,
     premultipliedAlpha: false,
-    powerPreference: "low-power",
+    powerPreference: "high-performance",
   });
   if (!gl) return null;
   let vertex, fragment, program, buffer;
@@ -256,6 +264,7 @@ export function createMenuGlass({
   background,
   surfaces = [],
   reducedMotion = false,
+  onRender = () => {},
 } = {}) {
   let disposed = false;
   let frame = 0;
@@ -337,9 +346,12 @@ export function createMenuGlass({
       ? parseFloat(styles.borderTopLeftRadius) || 28
       : 0;
     const warm =
-      element.dataset?.accent === "rose" || element.dataset?.accent === "amber"
-        ? 1
-        : 0.1;
+      element.dataset?.accent === "mint"
+        ? 2
+        : element.dataset?.accent === "rose" ||
+            element.dataset?.accent === "amber"
+          ? 1
+          : 0;
     gl.viewport(0, 0, pixelWidth, pixelHeight);
     gl.uniform2f(uniforms.viewport, innerWidth, innerHeight);
     gl.uniform2f(uniforms.size, width, height);
@@ -366,6 +378,7 @@ export function createMenuGlass({
       forced = false;
       const started = performance.now();
       for (const entry of entries) draw(entry, now);
+      onRender();
       const spent = performance.now() - started;
       // Adapt after sustained pressure; avoid changing resolution on every frame.
       slowFrames =

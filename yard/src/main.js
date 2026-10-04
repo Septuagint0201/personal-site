@@ -1,4 +1,5 @@
 import './style.css';
+import './interaction.css';
 import { createPlayground } from './scene.js';
 import { createDiscoveries } from './discoveries.js';
 
@@ -9,12 +10,11 @@ const motion = matchMedia('(prefers-reduced-motion: reduce)');
 const unlocked = new Set();
 const captions = { prism: '01 — PRISM STUDY', halo: '02 — LIQUID KNOT', orbit: '03 — QUIET ORBITS' };
 const studies = {
-  prism: { index: '01', title: 'Prism study', form: 'Icosahedron', character: 'Faceted / crystalline', description: 'Twenty faces, one borrowed sky. Each edge divides the room into a different reflection. Move closer to see the filament bend through the glass.', prompt: 'Turn down the light, then move the cursor slowly across a facet. Watch the edges hold onto the last glimmer.' },
-  halo: { index: '02', title: 'Liquid knot', form: 'Torus knot', character: 'Continuous / fluid', description: 'A single ribbon returns to itself, slipping over and under its own reflection. Its narrow curves gather light like the lip of a glass.', prompt: 'Try Daybreak and follow the warm reflection around the loop. Orbit slowly until the opening becomes a perfect little window.' },
-  orbit: { index: '03', title: 'Quiet orbits', form: 'Sphere + glass ring', character: 'Spherical / weightless', description: 'A lens with a world inside it. The central sphere folds the room into a small, curved image while its companion ring catches a different horizon.', prompt: 'Choose Aurora, then raise dispersion. Look through the center and compare its quiet interior with the bright outer rim.' },
+  prism: { index: '01', title: 'Prism study', form: 'Icosahedron', character: 'Faceted / crystalline', description: 'Twenty faces, one borrowed sky. Each edge divides the room into a different reflection. Drag the crystal itself to bring a new facet into the moonlight.', prompt: 'Turn down the light, then slowly rotate a facet. Watch the edges hold onto the last glimmer. Release the glass and its momentum carries on.' },
+  halo: { index: '02', title: 'Liquid knot', form: 'Torus knot', character: 'Continuous / fluid', description: 'A single ribbon returns to itself, slipping over and under its own reflection. Its narrow curves gather light like the lip of a glass.', prompt: 'Drag the knot until its opening becomes a perfect little window. Raise dispersion and follow the split colors around the loop.' },
+  orbit: { index: '03', title: 'Quiet orbits', form: 'Sphere + glass ring', character: 'Spherical / weightless', description: 'A lens with a world inside it. The central sphere folds the room into a small, curved image while its companion ring catches a different horizon.', prompt: 'Rotate the glass ring across the sphere. Compare their overlapping refractions, then hold the glass until its small companions drift apart.' },
 };
-const atmosphereOrder = ['daybreak', 'moonlight', 'aurora'];
-let playground, toastTimer = 0, keyboardHold = 0, atmosphere = 'moonlight', pathsVisible = false;
+let playground, toastTimer = 0, keyboardHold = 0, pathsVisible = false;
 
 function toast(message) {
   clearTimeout(toastTimer);
@@ -59,6 +59,7 @@ try {
   playground = createPlayground(stage, {
     onHit: () => discoveries.hit(),
     onHold: () => discoveries.hold(),
+    onSceneChange: updateStudy,
     onStatus: text => { $('#quality-label').textContent = text; },
     onError: showError,
   });
@@ -69,15 +70,8 @@ try {
   showError();
 }
 
-function chooseScene(name) {
+function updateStudy(name) {
   if (!captions[name]) return;
-  playground?.setScene(name);
-  document.querySelectorAll('[data-scene]').forEach(button => {
-    if (!(button instanceof HTMLButtonElement)) return;
-    const selected = button.dataset.scene === name;
-    button.setAttribute('aria-pressed', String(selected));
-    button.classList.toggle('is-active', selected);
-  });
   $('#scene-caption').textContent = captions[name];
   const study = studies[name];
   $('#study-index').textContent = `STUDY ${study.index} / 03`;
@@ -88,17 +82,7 @@ function chooseScene(name) {
   $('#study-prompt').textContent = study.prompt;
   document.body.dataset.study = name;
 }
-document.querySelectorAll('button[data-scene]').forEach(button => button.addEventListener('click', () => chooseScene(button.dataset.scene)));
-function chooseAtmosphere(name) {
-  if (!atmosphereOrder.includes(name)) return;
-  atmosphere = name;
-  playground?.setAtmosphere(name);
-  document.body.dataset.atmosphere = name;
-  document.querySelectorAll('[data-atmosphere]').forEach(button => {
-    if (button instanceof HTMLButtonElement) button.setAttribute('aria-pressed', String(button.dataset.atmosphere === name));
-  });
-}
-document.querySelectorAll('button[data-atmosphere]').forEach(button => button.addEventListener('click', () => chooseAtmosphere(button.dataset.atmosphere)));
+updateStudy('prism');
 function togglePaths() {
   pathsVisible = !pathsVisible;
   playground?.setLightPaths(pathsVisible);
@@ -113,7 +97,7 @@ function syncPause() {
 }
 function togglePause() {
   if (motion.matches && playground?.isPaused()) {
-    toast('Reduced motion is on. You can still orbit, change the light, and touch the glass.');
+    toast('Reduced motion is on. You can still look around, rotate the glass, and explore each study.');
     return;
   }
   playground?.setPaused(!playground.isPaused());
@@ -174,23 +158,27 @@ help.addEventListener('click', event => {
   if (event.target === help && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) help.close();
 });
 window.addEventListener('keydown', event => {
-  if (help.open || event.target.closest('input, button, a, textarea, select, [contenteditable="true"]')) return;
+  if (help.open || event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
   if (event.ctrlKey || event.altKey || event.metaKey) return;
   const key = event.key.toLowerCase();
+  if (key === 'arrowleft' || key === 'arrowright') {
+    event.preventDefault();
+    if (!event.repeat) playground?.step(key === 'arrowleft' ? -1 : 1);
+    return;
+  }
+  if (event.target.closest('button, a')) return;
   if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', ' '].includes(key)) event.preventDefault();
-  if (key === 'arrowleft') playground?.nudge(0.06, 0);
-  else if (key === 'arrowright') playground?.nudge(-0.06, 0);
-  else if (key === 'arrowup') playground?.nudge(0, 0.04);
+  if (key === 'arrowup') playground?.nudge(0, 0.04);
   else if (key === 'arrowdown') playground?.nudge(0, -0.04);
+  else if (key === 'a') playground?.nudge(-0.12, 0);
+  else if (key === 'd') playground?.nudge(0.12, 0);
   else if (event.repeat) return;
   else if (key === ' ') togglePause();
   else if (key === 'p' || key === 'enter') sendPulse();
   else if (key === 'r') playground?.reset();
   else if (key === '?') openNotes('guide');
-  else if (key === 'l') chooseAtmosphere(atmosphereOrder[(atmosphereOrder.indexOf(atmosphere) + 1) % atmosphereOrder.length]);
   else if (key === 't') togglePaths();
   else if (key === 'g') keyboardHold = setTimeout(() => discoveries.hold(), 1300);
-  else if (['1', '2', '3'].includes(key)) chooseScene(['prism', 'halo', 'orbit'][Number(key) - 1]);
 });
 window.addEventListener('keyup', event => { if (event.key.toLowerCase() === 'g') clearTimeout(keyboardHold); });
 window.addEventListener('blur', () => clearTimeout(keyboardHold));

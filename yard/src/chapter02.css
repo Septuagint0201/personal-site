@@ -177,7 +177,9 @@ input:focus-visible {
   color: #4f6c74;
 }
 @media (min-width: 901px) {
-  .gallery-intro h1 { white-space: nowrap; }
+  .gallery-intro h1 {
+    white-space: nowrap;
+  }
 }
 .gallery-description {
   font-size: 12px;
@@ -1091,5 +1093,177 @@ input:focus-visible {
     background:
       linear-gradient(90deg, #e9eddeaa, transparent 51%),
       linear-gradient(0deg, #e1e8df8a, transparent 37%);
+  }
+}
+/* The second collection is lit in ink blue, copper and opal. Keep the room's
+   contrast intact; the previous full-screen milky wash flattened the optics. */
+.gallery-wash {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(228, 239, 238, 0.65),
+      rgba(226, 237, 235, 0.33) 29%,
+      transparent 48%
+    ),
+    linear-gradient(0deg, rgba(204, 220, 220, 0.34), transparent 30%);
+}
+.gallery-intro h1 {
+  color: #183b48;
+  text-shadow: 0 2px 22px #e0f0ee55;
+}
+.gallery-intro h1 em {
+  color: #385f71;
+}
+.gallery-description {
+  color: #304f5d;
+  text-shadow: 0 1px 10px #e5f1ee88;
+}
+.gallery-console {
+  background: linear-gradient(
+    128deg,
+    rgba(228, 242, 241, 0.72),
+    rgba(202, 228, 231, 0.36) 52%,
+    rgba(202, 226, 236, 0.6)
+  );
+  backdrop-filter: blur(20px) saturate(1.4);
+}
+.study-tab[aria-pressed="true"] {
+  background: linear-gradient(120deg, #f3fbfce0, #c4e0e5a3);
+  box-shadow:
+    0 4px 20px #15395025,
+    inset 0 -1px 1px #4f8c9f66;
+}
+.study-tab strong {
+  color: #233e4f;
+}
+.console-actions {
+  align-items: center;
+  gap: 15px;
+}
+.quality-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 8px;
+  color: #435d69;
+}
+.quality-control > span {
+  letter-spacing: 0.03em;
+}
+.quality-control select {
+  font: inherit;
+  font-size: 9px;
+  border: 1px solid #d3e5ebbb;
+  border-radius: 7px;
+  padding: 7px 19px 7px 8px;
+  color: #294658;
+  background: #e3f0f16b;
+  cursor: pointer;
+  transition:
+    scale 0.2s,
+    box-shadow 0.2s,
+    background 0.2s;
+}
+.quality-control select:hover {
+  scale: 1.06;
+  background: #f3fcfba6;
+  box-shadow: 0 0 14px #eafafe6b;
+}
+.quality-control select:active {
+  scale: 0.95;
+}
+.quality-control select:focus-visible {
+  outline: 2px solid #42869e;
+  outline-offset: 3px;
+}
+.canvas-hint {
+  color: #1d4256;
+  text-shadow: 0 1px 6px #d9eff2;
+}
+.render-loading {
+  background: linear-gradient(120deg, #dae8e7, #b2cbd4);
+}
+.sculpture-icon {
+  width: 25px;
+  border-radius: 55% 42% 65% 40%;
+  transform: rotate(25deg);
+}
+.sculpture-icon:after {
+  inset: 5px;
+  width: auto;
+  height: auto;
+  border-radius: 55% 45%;
+  background: transparent;
+}
+.passage-icon,
+.passage-icon:after {
+  border-radius: 50% 50% 4% 4%;
+  transform: rotate(-4deg);
+}
+@media (max-width: 900px) {
+  .console-settings {
+    gap: 17px;
+    padding-inline: 10px;
+  }
+  .console-actions {
+    gap: 10px;
+  }
+  .quality-control > span {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .gallery-wash {
+    background: linear-gradient(
+      180deg,
+      #e5f0ee8a,
+      transparent 32%,
+      transparent 69%,
+      #b9d0d36b
+    );
+  }
+  .gallery-intro {
+    top: 96px;
+  }
+  .gallery-intro h1 {
+    font-size: 49px;
+  }
+  .gallery-description {
+    max-width: 270px;
+    font-size: 9px;
+  }
+  .console-actions {
+    align-items: center;
+    gap: 10px;
+  }
+  .console-actions button {
+    padding: 8px 0;
+  }
+  .quality-control > span {
+    display: inline;
+  }
+  .quality-control select {
+    padding: 6px 14px 6px 6px;
+  }
+  .gallery-footer {
+    font-size: 6px;
+  }
+  .gallery-footer p:first-child {
+    max-width: 57%;
+    line-height: 1.5;
+  }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  .quality-control > span {
+    display: none;
+  }
+  .quality-control select {
+    padding: 4px;
+    font-size: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .quality-control select {
+    transition: none;
   }
 }

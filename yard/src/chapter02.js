@@ -11,23 +11,23 @@ const studies = {
   sculpture: {
     index: 0,
     description:
-      "A suspended moment.<br />Glass, just before it becomes something else.",
-    caption: "01 — A SHAPE THAT NEVER SETTLES",
-    title: "Liquid sculpture",
+      "A folded crystal, carved by a current.<br />An open heart. An impossible surface.",
+    caption: "01 — CHRYSALIS / A FOLD IN CLEAR MATTER",
+    title: "Chrysalis",
   },
   passage: {
     index: 1,
     description:
-      "A corridor made of currents.<br />Every threshold bends the world beyond.",
-    caption: "02 — THE SPACE BETWEEN RIPPLES",
-    title: "Glass passage",
+      "A procession of liquid vaults.<br />A thousand thresholds inside one beam.",
+    caption: "02 — NAVE / A PROCESSION OF LIQUID VAULTS",
+    title: "Nave",
   },
   waterfall: {
     index: 2,
     description:
-      "A slow cascade, held in light.<br />Falling glass meets a restless surface.",
-    caption: "03 — A CASCADE WITHOUT AN END",
-    title: "Glass waterfall",
+      "Three curtains, caught in the fall.<br />A field of light beneath the surface.",
+    caption: "03 — UNDERTOW / CURTAINS OF FALLING LIGHT",
+    title: "Undertow",
   },
 };
 let renderer;
@@ -83,6 +83,12 @@ function initialize() {
   loading.classList.remove("is-ready");
   try {
     renderer = createLiquidRenderer(canvas, {
+      onPreparing() {
+        clearTimeout(loadingTimeout);
+        gallery.dataset.renderer = "preparing";
+        loading.hidden = false;
+        loading.classList.remove("is-ready");
+      },
       onReady() {
         fallback.hidden = true;
         gallery.dataset.renderer = "ready";
@@ -110,6 +116,7 @@ function initialize() {
     renderer.setDispersion(
       Number(document.querySelector("#spectrum-range").value) / 100,
     );
+    renderer.setQuality(document.querySelector("#quality-select").value);
     syncMotion();
     selectStudy(gallery.dataset.study, false);
   } catch (error) {
@@ -134,6 +141,13 @@ document.querySelector("#spectrum-range").addEventListener("input", (event) => {
     `${event.target.value}%`;
   renderer?.setDispersion(Number(event.target.value) / 100);
 });
+document
+  .querySelector("#quality-select")
+  .addEventListener("change", (event) => {
+    renderer?.setQuality(event.target.value);
+    gallery.dataset.quality = event.target.value;
+    announce(`${event.target.selectedOptions[0].textContent} optical quality`);
+  });
 motion.addEventListener("click", () => {
   if (renderer) {
     renderer.setPaused(!renderer.state.paused);
@@ -166,6 +180,7 @@ notes.addEventListener("click", (event) => {
 
 canvas.addEventListener("pointerdown", (event) => {
   if (event.button !== 0) return;
+  renderer?.press();
   canvas.setPointerCapture(event.pointerId);
   touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
   if (touches.size > 1) {
@@ -178,6 +193,8 @@ canvas.addEventListener("pointerdown", (event) => {
   pointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
   dragDistance = 0;
 });
+canvas.addEventListener("pointerenter", () => renderer?.setHover(1));
+canvas.addEventListener("pointerleave", () => renderer?.setHover(0));
 canvas.addEventListener("pointermove", (event) => {
   if (touches.has(event.pointerId))
     touches.set(event.pointerId, { x: event.clientX, y: event.clientY });

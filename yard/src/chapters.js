@@ -11,7 +11,7 @@ export const chapters = [
     href: "/chapters/01/",
     cover: "/covers/light.svg",
     accent: "ice",
-    tags: ["3 glass studies", "3 atmospheres", "Hidden discoveries"],
+    tags: ["3 orbital studies", "Moonlight gallery", "Hidden discoveries"],
     note: "GLASS / LIGHT / PLAY",
   },
   {
@@ -20,7 +20,7 @@ export const chapters = [
     shortTitle: "Liquid light",
     subtitle: "A gallery of fluid possibilities",
     description:
-      "Three studies in liquid glass. Follow a drop, enter a passage, or watch light fall into water.",
+      "Folded crystal, liquid vaults, and a falling veil. Three new studies in the colour and substance of light.",
     status: "Open studio",
     href: "/chapters/02/",
     cover: "/covers/liquid.svg",

@@ -18,6 +18,7 @@
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23dae4e1'/%3E%3Cpath d='M32 9 37 27 55 32 37 37 32 55 27 37 9 32 27 27Z' fill='%232e474c'/%3E%3C/svg%3E"
     />
     <link rel="stylesheet" href="/src/chapter02.css" />
+    <link rel="stylesheet" href="/src/interaction.css" />
   </head>
   <body>
     <main class="liquid-gallery" id="liquid-gallery" data-study="sculpture">
@@ -59,7 +60,8 @@
           in <em>motion.</em>
         </h1>
         <p class="gallery-description" id="study-description">
-          A suspended moment.<br />Glass, just before it becomes something else.
+          A folded crystal, carved by a current.<br />An open heart. An
+          impossible surface.
         </p>
         <div class="study-index">
           <span id="study-number">01</span><span class="index-rule"></span
@@ -90,8 +92,8 @@
           >
             <span class="study-icon sculpture-icon" aria-hidden="true"></span
             ><span
-              ><small>01 / SUSPENDED</small
-              ><strong>Liquid sculpture</strong></span
+              ><small>01 / FOLDED CRYSTAL</small
+              ><strong>Chrysalis</strong></span
             >
           </button>
           <button
@@ -101,9 +103,7 @@
             aria-pressed="false"
           >
             <span class="study-icon passage-icon" aria-hidden="true"></span
-            ><span
-              ><small>02 / THROUGH</small><strong>Glass passage</strong></span
-            >
+            ><span><small>02 / LIQUID VAULTS</small><strong>Nave</strong></span>
           </button>
           <button
             class="study-tab"
@@ -112,7 +112,9 @@
             aria-pressed="false"
           >
             <span class="study-icon waterfall-icon" aria-hidden="true"></span
-            ><span><small>03 / FALLING</small><strong>Waterfall</strong></span>
+            ><span
+              ><small>03 / FALLING LIGHT</small><strong>Undertow</strong></span
+            >
           </button>
         </div>
         <div class="console-settings">
@@ -135,6 +137,14 @@
               value="65"
           /></label>
           <div class="console-actions">
+            <label class="quality-control" for="quality-select"
+              ><span>Quality</span
+              ><select id="quality-select" aria-label="Optical quality">
+                <option value="high" selected>High</option>
+                <option value="ultra">Ultra</option>
+                <option value="adaptive">Adaptive</option>
+              </select></label
+            >
             <button id="motion-toggle" type="button" aria-pressed="false">
               Pause motion <span aria-hidden="true">Ⅱ</span></button
             ><button id="view-reset" type="button">
@@ -145,7 +155,7 @@
       </section>
 
       <footer class="gallery-footer">
-        <p id="study-caption">01 — A SHAPE THAT NEVER SETTLES</p>
+        <p id="study-caption">01 — CHRYSALIS / A FOLD IN CLEAR MATTER</p>
         <p class="render-status">
           <span></span><span id="render-status">TRACING THE LIGHT</span>
         </p>
@@ -193,20 +203,21 @@
         <div>
           <span>01</span>
           <p>
-            <strong>Three working sketches</strong>Suspended liquid, a rippling
-            passage, and falling glass. These are three possible directions for
-            the collection.
+            <strong>Three optical sculptures</strong>Chrysalis folds a solid
+            crystal around an open heart. Nave passes through liquid gothic
+            vaults. Undertow layers three fluted curtains above a rippling
+            basin.
           </p>
         </div>
         <div>
           <span>02</span>
           <p>
             <strong>Traced in real time</strong>A WebGL shader finds curved
-            surfaces and traces the first glass volume, including entry and exit
-            refraction, thickness absorption, and one internal reflection.
-            Outgoing rays sample the procedural gallery; further glass volumes
-            are not recursively traced. Floor light patterns are artistic
-            caustic studies.
+            surfaces and follows red, green and blue along separate paths
+            through multiple glass boundaries. Fresnel reflection, total
+            internal reflection, and absorption through the glass create its
+            polished depth. Reflected rays sample the architectural room; floor
+            caustics are an artistic light field.
           </p>
         </div>
         <div>
@@ -220,8 +231,9 @@
         </div>
       </div>
       <p class="notes-footnote">
-        Rendering resolution adapts to your device. Reduced-motion preferences
-        start the gallery still; you can resume it at any time.
+        High is the default. Ultra raises image resolution and the optical path
+        budget; Adaptive adjusts resolution for smoother motion. Reduced-motion
+        preferences start the gallery still; you can resume it at any time.
       </p>
     </dialog>
     <div

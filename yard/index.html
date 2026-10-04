@@ -17,7 +17,8 @@
       ><style>
         .card-stack,
         .gallery-toolbar,
-        .chapter-rail {
+        .chapter-rail,
+        .orbit-controls {
           display: none;
         }
         .collection {
@@ -73,9 +74,29 @@
             class="card-stage"
             id="card-stage"
             tabindex="0"
-            aria-label="Chapter preview. Move toward the upper or lower edge to reveal a chapter. Swipe or use arrow keys to browse."
+            aria-label="Chapter orbit. Move toward an edge to preview. Scroll, swipe or use the up and down arrow keys to browse."
           >
             <div class="card-stack" id="cards"></div>
+            <div class="orbit-controls" aria-label="Browse the chapter orbit">
+              <button
+                id="previous"
+                class="glass-arrow"
+                data-direction="up"
+                type="button"
+                aria-label="Previous chapter"
+              >
+                <canvas class="arrow-glass" aria-hidden="true"></canvas>
+              </button>
+              <button
+                id="next"
+                class="glass-arrow"
+                data-direction="down"
+                type="button"
+                aria-label="Next chapter"
+              >
+                <canvas class="arrow-glass" aria-hidden="true"></canvas>
+              </button>
+            </div>
             <noscript
               ><article class="no-script-card">
                 <p class="eyebrow">Chapter 01 · Open now</p>
@@ -91,20 +112,13 @@
           </div>
           <div class="gallery-toolbar">
             <p class="browse-hint">
-              <span aria-hidden="true">↕</span> Approach an edge to explore
-              <span class="hint-dot">·</span> Click to unfold
+              <span aria-hidden="true">↕</span> Move to preview
+              <span class="hint-dot">·</span> Scroll or ↑ ↓ to orbit
             </p>
             <div class="pagination">
               <span id="page-current">01</span
               ><span class="pagination-line"><i id="page-progress"></i></span
               ><span id="page-total">03</span>
-            </div>
-            <div class="arrows">
-              <button id="previous" type="button" aria-label="Previous chapter">
-                ↑</button
-              ><button id="next" type="button" aria-label="Next chapter">
-                ↓
-              </button>
             </div>
           </div>
         </div>
