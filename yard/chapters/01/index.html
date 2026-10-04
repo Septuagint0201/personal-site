@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#080b13" />
+    <meta name="description" content="Chapter 01 of YARD: an interactive world of glass, three light atmospheres, material studies, and hidden discoveries." />
+    <title>Chapter 01 — Light, in a different state · YARD</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23080b13'/%3E%3Cpath d='M32 9 37 27 55 32 37 37 32 55 27 37 9 32 27 27Z' fill='%23dfedf6'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <main class="experience" aria-label="Yard optical playground">
+      <div id="stage" tabindex="0" aria-label="Interactive glass sculpture. Drag to orbit, click to resonate. Keyboard controls in How to play."></div>
+      <div class="vignette" aria-hidden="true"></div>
+
+      <div class="interface">
+        <header class="site-header">
+          <div class="identity">
+            <button id="sigil" class="wordmark" type="button" aria-label="Yard signature" title="A little signature">
+              <svg class="signature" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 1.5 19.2 12.8 30.5 16 19.2 19.2 16 30.5 12.8 19.2 1.5 16 12.8 12.8Z" fill="currentColor" /></svg>
+              <span>YARD</span>
+            </button>
+            <a class="chapter-back" href="/"><span aria-hidden="true">↖</span> All chapters</a>
+          </div>
+          <nav class="header-actions" aria-label="Experience options">
+            <button id="sound-toggle" class="quiet-button sound-button" type="button" aria-pressed="false">Sound off</button>
+            <span class="header-divider" aria-hidden="true"></span>
+            <button id="help-toggle" class="quiet-button" type="button" aria-controls="help-dialog">Field notes <span class="help-mark" aria-hidden="true">↗</span></button>
+          </nav>
+        </header>
+
+        <section class="intro" aria-labelledby="headline">
+          <p class="eyebrow"><span aria-hidden="true"></span> Chapter 01 · An optical playground</p>
+          <h1 id="headline">Light,<br />in a different<br /><em>state.</em></h1>
+          <p class="intro-copy">A small universe of glass.<br /> Yours to disturb.</p>
+          <div class="atmosphere-picker" role="group" aria-label="Light atmosphere">
+            <button type="button" data-atmosphere="daybreak" aria-pressed="false"><span class="atmosphere-dot daybreak" aria-hidden="true"></span>Daybreak</button>
+            <button type="button" data-atmosphere="moonlight" aria-pressed="true"><span class="atmosphere-dot moonlight" aria-hidden="true"></span>Moonlight</button>
+            <button type="button" data-atmosphere="aurora" aria-pressed="false"><span class="atmosphere-dot aurora" aria-hidden="true"></span>Aurora</button>
+          </div>
+          <p class="interaction-hint"><span>Drag to orbit</span><i aria-hidden="true">·</i><span>Scroll to explore</span><i aria-hidden="true">·</i><span>Touch the glass</span></p>
+        </section>
+
+        <div class="specimen-note" aria-hidden="true"><span>REAL-TIME LIGHT STUDIES</span><span>EST. 2026</span></div>
+
+        <button id="controls-toggle" class="controls-toggle" type="button" aria-label="Expand light controls" aria-controls="controls" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M4 17h16" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" /><circle cx="9" cy="7" r="2.5" fill="#151d2a" stroke="currentColor" stroke-width="1.3"/><circle cx="15" cy="17" r="2.5" fill="#151d2a" stroke="currentColor" stroke-width="1.3"/></svg>
+        </button>
+
+        <section id="controls" class="controls" aria-label="Sculpture controls">
+          <div class="scene-picker">
+            <span class="control-label">Choose a study</span>
+            <div class="scene-switcher" role="group" aria-label="Glass study">
+              <button class="scene-button is-active" type="button" data-scene="prism" aria-pressed="true"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m10 2 7 13-7 3-7-3 7-13Z" stroke="currentColor" stroke-width="1.1"/><path d="m10 2 1 11 6 2m-6-2-8 2m8-2-1 5" stroke="currentColor" stroke-width=".8"/></svg><span>Prism</span></button>
+              <button class="scene-button" type="button" data-scene="halo" aria-pressed="false"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><ellipse cx="10" cy="10" rx="5.7" ry="8" transform="rotate(35 10 10)" stroke="currentColor" stroke-width="1.1"/><ellipse cx="10" cy="10" rx="2.8" ry="5.7" transform="rotate(35 10 10)" stroke="currentColor" stroke-width=".8"/></svg><span>Halo</span></button>
+              <button class="scene-button" type="button" data-scene="orbit" aria-pressed="false"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="2.4" stroke="currentColor" stroke-width="1.1"/><ellipse cx="10" cy="10" rx="8" ry="4" transform="rotate(-35 10 10)" stroke="currentColor" stroke-width="1.1"/><circle cx="15.5" cy="5.6" r="1.4" fill="currentColor"/></svg><span>Orbit</span></button>
+            </div>
+          </div>
+          <div class="control-field">
+            <div class="range-heading"><label class="control-label" for="light">Light intensity</label><output id="light-value" for="light">65%</output></div>
+            <input id="light" type="range" min="0" max="100" value="65" aria-label="Light intensity" />
+          </div>
+          <div class="control-field">
+            <div class="range-heading"><label class="control-label" for="dispersion">Dispersion</label><output id="dispersion-value" for="dispersion">55%</output></div>
+            <input id="dispersion" type="range" min="0" max="100" value="55" aria-label="Glass dispersion" />
+          </div>
+          <div class="control-actions">
+            <button id="pulse" class="pulse-button" type="button"><span class="pulse-symbol" aria-hidden="true">✧</span> Send a pulse</button>
+            <div class="secondary-actions">
+              <button id="pause" class="text-button" type="button" aria-pressed="false">Pause motion</button>
+              <span aria-hidden="true">/</span>
+              <button id="reset" class="text-button" type="button">Reset view</button>
+            </div>
+          </div>
+        </section>
+
+        <footer class="experience-footer">
+          <p id="scene-caption" class="scene-caption">01 — PRISM STUDY</p>
+          <button id="collection-toggle" class="discovery-status" type="button" aria-controls="help-dialog"><span class="discovery-symbol" aria-hidden="true">✧</span><span id="secret-count">0 / 3 discoveries</span><span class="collection-arrow" aria-hidden="true">↗</span></button>
+          <p class="quality-status"><span class="live-dot" aria-hidden="true"></span><span id="quality-label">LIVE · INTERACTIVE</span></p>
+        </footer>
+      </div>
+
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+      <div id="loading" class="loading" role="status">
+        <svg class="loading-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 1.5 19.2 12.8 30.5 16 19.2 19.2 16 30.5 12.8 19.2 1.5 16 12.8 12.8Z" fill="currentColor" /></svg>
+        <p>Bending the light<span class="loading-dots">…</span></p>
+        <span>A moment for a little wonder.</span>
+      </div>
+
+      <div id="fallback" class="fallback" role="status" hidden>
+        <span class="eyebrow">A little pause</span>
+        <h2>The light needs<br /><em>a little help.</em></h2>
+        <p>This experience needs WebGL to render its glass sculptures. Your browser could not start the 3D renderer. Try enabling hardware acceleration or opening YARD in another browser.</p>
+        <a class="fallback-link" href="/chapters/01/">Try again <span aria-hidden="true">↗</span></a>
+        <a class="text-button" href="/">All chapters</a>
+        <a class="text-button" href="https://candy-spt.com/">Visit Septuagint</a>
+      </div>
+
+      <dialog id="help-dialog" class="help-dialog" aria-labelledby="help-title">
+        <button id="help-close" class="dialog-close" type="button" aria-label="Close field notes"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></button>
+        <p class="eyebrow">Chapter 01 · Field notes</p>
+        <h2 id="help-title">A closer<br /><em>look.</em></h2>
+        <div class="notes-tabs" role="tablist" aria-label="Field notes sections">
+          <button id="tab-studies" type="button" role="tab" aria-selected="true" aria-controls="panel-studies" data-notes-tab="studies">The studies</button>
+          <button id="tab-discoveries" type="button" role="tab" aria-selected="false" aria-controls="panel-discoveries" tabindex="-1" data-notes-tab="discoveries">Discoveries</button>
+          <button id="tab-guide" type="button" role="tab" aria-selected="false" aria-controls="panel-guide" tabindex="-1" data-notes-tab="guide">How to play</button>
+        </div>
+        <section id="panel-studies" class="notes-panel" role="tabpanel" aria-labelledby="tab-studies" tabindex="0">
+          <p class="notes-caption" id="study-index">STUDY 01 / 03</p>
+          <h3 id="study-name">Prism study</h3>
+          <p class="notes-copy" id="study-description">Twenty faces, one borrowed sky. Each edge divides the room into a different reflection. Move closer to see the filament bend through the glass.</p>
+          <dl class="material-stats"><div><dt>Form</dt><dd id="study-form">Icosahedron</dd></div><div><dt>Refraction</dt><dd>1.50 IOR</dd></div><div><dt>Character</dt><dd id="study-character">Faceted / crystalline</dd></div></dl>
+          <p class="observation"><span>TRY THIS</span><span id="study-prompt">Turn down the light, then move the cursor slowly across a facet. Watch the edges hold onto the last glimmer.</span></p>
+          <button id="paths-toggle" class="paths-toggle" type="button" aria-pressed="false"><span aria-hidden="true">⤳</span><span>Show light paths</span></button>
+          <p class="path-note">A drawn spectrum through the room. Close these notes to explore it in 3D.</p>
+          <div class="study-navigation" role="group" aria-label="Read a material study"><button data-scene="prism" type="button" aria-pressed="true">01 · Prism</button><button data-scene="halo" type="button" aria-pressed="false">02 · Halo</button><button data-scene="orbit" type="button" aria-pressed="false">03 · Orbit</button></div>
+        </section>
+        <section id="panel-discoveries" class="notes-panel" role="tabpanel" aria-labelledby="tab-discoveries" tabindex="0" hidden>
+          <p class="notes-copy collection-intro">Small rewards for staying curious. Your collection stays in this browser; each discovery can be experienced again.</p>
+          <ol class="discovery-collection">
+            <li data-discovery="resonance"><span class="discovery-number">01</span><div><h3>Unheard frequency</h3><p>One touch makes a sound. A few in quick succession might make something more.</p><button type="button" data-replay="resonance" hidden>Experience again ↗</button></div><span class="discovery-state">UNDISCOVERED</span></li>
+            <li data-discovery="gravity"><span class="discovery-number">02</span><div><h3>A moment suspended</h3><p>The glass rewards patience. Keep a gentle hold and let the world drift.</p><button type="button" data-replay="gravity" hidden>Experience again ↗</button></div><span class="discovery-state">UNDISCOVERED</span></li>
+            <li data-discovery="constellation"><span class="discovery-number">03</span><div><h3>A hidden sky</h3><p>Every world has a maker's mark. Visit the signature more than once.</p><button type="button" data-replay="constellation" hidden>Experience again ↗</button></div><span class="discovery-state">UNDISCOVERED</span></li>
+          </ol>
+        </section>
+        <section id="panel-guide" class="notes-panel" role="tabpanel" aria-labelledby="tab-guide" tabindex="0" hidden>
+        <p class="help-lead">Nothing here is quite still. Make yourself part of the experiment.</p>
+        <dl class="gesture-guide">
+          <div><dt>Move around</dt><dd>Drag to orbit. Scroll or pinch to move closer.</dd></div>
+          <div><dt>Make a ripple</dt><dd>Touch the glass or send a pulse through the scene.</dd></div>
+          <div><dt>Change the light</dt><dd>Choose Daybreak, Moonlight, or Aurora. Explore three studies and adjust intensity and dispersion.</dd></div>
+        </dl>
+        <div class="keyboard-guide" aria-label="Keyboard shortcuts">
+          <p><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd><span>Orbit</span></p>
+          <p><kbd>Space</kbd><span>Pause</span></p>
+          <p><kbd>P</kbd><span>Pulse</span></p>
+          <p><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><span>Studies</span></p>
+          <p><kbd>R</kbd><span>Reset</span></p>
+          <p><kbd>L</kbd><span>Light atmosphere</span></p>
+          <p><kbd>T</kbd><span>Light paths</span></p>
+          <p><kbd>?</kbd><span>This guide</span></p>
+          <p class="keyboard-hold"><kbd>G</kbd><span>Hold G to hold the glass.</span></p>
+        </div>
+        <p class="secret-hint"><span aria-hidden="true">✧</span> Three small secrets are hiding here. Resonate with the glass. Hold the light. Look closer at the signature.</p>
+        </section>
+        <div class="notes-footer"><a href="/">← All chapters</a><a href="https://candy-spt.com/">Visit Septuagint ↗</a></div>
+      </dialog>
+
+      <noscript><div class="noscript"><h1>YARD</h1><p>A playground of glass and light. Enable JavaScript to enter this interactive 3D experience.</p><a href="https://candy-spt.com/">Visit Septuagint ↗</a></div></noscript>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

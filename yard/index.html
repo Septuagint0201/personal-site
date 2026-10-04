@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#090d16" />
+    <meta
+      name="description"
+      content="YARD is a growing collection of interactive worlds. Step inside a chapter of glass, light, and curiosity."
+    />
+    <title>YARD — A collection of small universes</title>
+    <link rel="stylesheet" href="/src/menu.css" />
+    <noscript
+      ><style>
+        .card-stack,
+        .gallery-toolbar,
+        .chapter-rail {
+          display: none;
+        }
+        .collection {
+          display: block;
+        }
+        .card-stage {
+          height: auto;
+          cursor: default;
+        }
+        .no-script-card {
+          min-height: 350px;
+        }
+      </style></noscript
+    >
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23090d16'/%3E%3Cpath d='m32 8 5 19 19 5-19 5-5 19-5-19-19-5 19-5Z' fill='%23e1f3f6'/%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <div class="ambient" aria-hidden="true">
+      <div class="ambient-orbit"></div>
+      <div class="ambient-orbit orbit-two"></div>
+      <i class="star star-one">✦</i><i class="star star-two">✧</i>
+    </div>
+    <header class="collection-header">
+      <a class="wordmark" href="/" aria-label="Yard collection"
+        ><span aria-hidden="true">✦</span> YARD</a
+      ><span class="header-note">A COLLECTION OF SMALL UNIVERSES</span
+      ><a class="candy-link" href="https://candy-spt.com/"
+        ><span>Septuagint’s home</span><span aria-hidden="true">↗</span></a
+      >
+    </header>
+    <main>
+      <section class="collection-intro" aria-labelledby="collection-title">
+        <div>
+          <p class="eyebrow"><span></span> The chapter index</p>
+          <h1 id="collection-title">A place for <em>curiosity.</em></h1>
+        </div>
+        <p class="intro-aside">
+          Small experiments. Unexpected discoveries.<br />
+          Pick a world. Make it your own.
+        </p>
+      </section>
+      <section
+        class="collection"
+        aria-label="Interactive chapters"
+        aria-roledescription="carousel"
+      >
+        <div class="gallery-main">
+          <div
+            class="card-stage"
+            id="card-stage"
+            tabindex="0"
+            aria-label="Chapter preview. Swipe or use left and right arrow keys to browse."
+          >
+            <div class="card-stack" id="cards"></div>
+            <noscript
+              ><article class="no-script-card">
+                <p class="eyebrow">Chapter 01 · Open now</p>
+                <h2>Light, in a different state.</h2>
+                <p>Three glass studies. A small universe, yours to disturb.</p>
+                <a href="/chapters/01/">Enter chapter ↗</a>
+                <p>
+                  Enable JavaScript for the interactive chapter slider and 3D
+                  experience.
+                </p>
+              </article></noscript
+            >
+          </div>
+          <div class="gallery-toolbar">
+            <p class="browse-hint">
+              <span aria-hidden="true">↔</span> Swipe to wander
+              <span class="hint-dot">·</span> Move to catch the light
+            </p>
+            <div class="pagination">
+              <span id="page-current">01</span
+              ><span class="pagination-line"><i id="page-progress"></i></span
+              ><span id="page-total">03</span>
+            </div>
+            <div class="arrows">
+              <button id="previous" type="button" aria-label="Previous chapter">
+                ←</button
+              ><button id="next" type="button" aria-label="Next chapter">
+                →
+              </button>
+            </div>
+          </div>
+        </div>
+        <nav class="chapter-rail" aria-label="Choose a chapter">
+          <p class="rail-label">CONTENTS</p>
+          <div id="thumbnails" class="thumbnails"></div>
+          <span class="rail-end" aria-hidden="true">✧</span>
+        </nav>
+        <p
+          id="slide-status"
+          class="sr-only"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        ></p>
+      </section>
+    </main>
+    <footer class="collection-footer">
+      <span
+        >An ongoing collection <i aria-hidden="true">✧</i> One chapter open.
+        More to come.</span
+      ><span>MADE TO BE EXPLORED</span>
+    </footer>
+    <script type="module" src="/src/menu.js"></script>
+  </body>
+</html>

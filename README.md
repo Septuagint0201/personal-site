@@ -2,6 +2,28 @@
 
 I'm glad you stopped by. I hope you find something interesting here that brings a smile to your face!
 
+## Repository layout
+
+本仓库同时维护两个网站：
+
+- 根目录：Candy 个人主页，部署于 https://candy-spt.com/ 。
+- [`yard/`](yard/README.md)：YARD 章节目录、第一章玻璃光学展厅及后续章节，独立构建并部署于 https://yard.septuagint21.org/ 。
+
+YARD 使用站点根路径；在 `yard/` 内运行，不直接作为 Candy 的 `/yard/` 子路径发布：
+
+```sh
+cd yard
+npm ci
+npm run dev
+npm run build
+```
+
+`yard/dist/` 是 YARD 的部署产物，构建会为目录及各章节生成 `index.html` 和适配现有 Nginx 的 `yard.html`。源码、封面、依赖锁文件和第三方许可证均纳入 Git；`node_modules/`、`dist/` 与日志仅留在开发目录，不纳入提交。
+
+本机开发仓库位于 `E:\AMLY\works\HTML\personal-site`。导入前的 `E:\AMLY\works\HTML\yard` 副本保留，后续统一在本仓库的 `yard/` 子目录开发。
+
+本机 `E:\AMLY\doc\repository-backup\personal-site` 是只保存 Git 数据的裸备份仓库，不包含检出的网页或依赖。通过 `git -C "E:\AMLY\doc\repository-backup\personal-site" fetch development` 同步开发仓库的引用与对象；不自动清除备份独有的历史引用。需要恢复工作文件时，将该裸仓库克隆到新的开发目录。
+
 ## Glass Lab
 
 主页 `index.html` 已应用用户确认的 Liquid Glass 材质。独立测试页为 `glass-lab.html`；测试页调整不会自动覆盖主页。
@@ -35,7 +57,7 @@ python -m http.server 8765 --bind 127.0.0.1
 
 首页装饰围绕个人宇宙主题：页眉字标、星点、椭圆轨道、两侧留白文字与页脚。星点和轨道由背景渲染器绘制，同样参与玻璃折射；1000px 及以下隐藏两侧文字。链接增加分区标识与方向箭头，箭头仅在悬停或键盘聚焦时轻微移动，并遵循减少动态效果设置。
 
-展示布局以 400px 主卡片和 38px 名字为视觉中心；GitHub 为主要入口，YARD 的独立玻璃行通往 [互动章节目录](https://yard.septuagint21.org/)，Steam、Discord、X、Pixiv 为双列链接，Email 独立收尾。YARD 目录提供返回 Candy 主页的入口，后续章节可在独立的 YARD 项目继续扩展。兴趣标签「代码、游戏、图像」对应现有入口，不包含实时状态或未经提供的近期项目。介绍文字提升到 14px，侧边装饰降低视觉权重。1000px 及以下将短文案移到卡片上方，手机进一步调整头像、字号和间距；较矮屏幕正常纵向滚动。
+展示布局以 400px 主卡片和 38px 名字为视觉中心；GitHub 为主要入口，YARD 的独立玻璃行通往 [互动章节目录](https://yard.septuagint21.org/)，Steam、Discord、X、Pixiv 为双列链接，Email 独立收尾。YARD 目录提供返回 Candy 主页的入口，后续章节可在本仓库的 `yard/` 子项目继续扩展。兴趣标签「代码、游戏、图像」对应现有入口，不包含实时状态或未经提供的近期项目。介绍文字提升到 14px，侧边装饰降低视觉权重。1000px 及以下将短文案移到卡片上方，手机进一步调整头像、字号和间距；较矮屏幕正常纵向滚动。
 
 首页通过 `composition: 1` 启用独立的背景构图：降低后层反光、柔化插画细节，深色主题中央采用柔和遮罩提高文字对比。700px 以下的竖屏使用纵向叠片和等比插画裁切。实验页不传此选项，保持原有参数与画面。前景玻璃材质基线保持不变。入场只渐显内容，不移动玻璃采样边界；头像波纹播放一次，名字打字完成后隐藏光标。粒子数量为 18–48，在卡片区域进一步减弱；卡片边界在布局变化时缓存，粒子帧内不读取 DOM。减少动态效果时立即显示完整名字并停用入场动画。
 
