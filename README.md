@@ -22,7 +22,7 @@ npm run build
 
 本机开发仓库位于 `E:\AMLY\works\HTML\personal-site`。导入前的 `E:\AMLY\works\HTML\yard` 副本保留，后续统一在本仓库的 `yard/` 子目录开发。
 
-本机 `E:\AMLY\doc\repository-backup\personal-site` 是只保存 Git 数据的裸备份仓库，不包含检出的网页或依赖。通过 `git -C "E:\AMLY\doc\repository-backup\personal-site" fetch development` 同步开发仓库的引用与对象；不自动清除备份独有的历史引用。需要恢复工作文件时，将该裸仓库克隆到新的开发目录。
+本机 `E:\AMLY\doc\repository-backup\personal-site` 是普通备份仓库，保留完整 `.git` 和当前提交中所有受 Git 跟踪的文件。备份不复制未跟踪或被忽略的文件，例如 `node_modules/`、`dist/`、日志；开发目录中的这些文件继续保留。备份同步前应确认工作区干净，然后依次执行 `git -C "E:\AMLY\doc\repository-backup\personal-site" fetch development` 和 `git -C "E:\AMLY\doc\repository-backup\personal-site" merge --ff-only development/main`。`development` 使用普通远端分支映射，不直接覆盖当前检出的分支，也不自动清除备份独有的历史引用。
 
 ## Glass Lab
 
