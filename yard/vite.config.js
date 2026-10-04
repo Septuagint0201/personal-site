@@ -2,7 +2,11 @@ import { defineConfig } from "vite";
 import { copyFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-const pages = { collection: "index.html", chapter01: "chapters/01/index.html" };
+const pages = {
+  collection: "index.html",
+  chapter01: "chapters/01/index.html",
+  chapter02: "chapters/02/index.html",
+};
 
 export default defineConfig({
   plugins: [

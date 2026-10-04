@@ -20,7 +20,7 @@ npm run build
 
 `yard/dist/` 是 YARD 的部署产物，构建会为目录及各章节生成 `index.html` 和适配现有 Nginx 的 `yard.html`。源码、封面、依赖锁文件和第三方许可证均纳入 Git；`node_modules/`、`dist/` 与日志仅留在开发目录，不纳入提交。
 
-本机开发仓库位于 `E:\AMLY\works\HTML\personal-site`。导入前的 `E:\AMLY\works\HTML\yard` 副本保留，后续统一在本仓库的 `yard/` 子目录开发。
+本机开发仓库位于 `E:\AMLY\works\HTML\personal-site`。原独立的 `E:\AMLY\works\HTML\yard` 已删除，后续统一在本仓库的 `yard/` 子目录开发。
 
 本机 `E:\AMLY\doc\repository-backup\personal-site` 是普通备份仓库，保留完整 `.git` 和当前提交中所有受 Git 跟踪的文件。备份不复制未跟踪或被忽略的文件，例如 `node_modules/`、`dist/`、日志；开发目录中的这些文件继续保留。备份同步前应确认工作区干净，然后依次执行 `git -C "E:\AMLY\doc\repository-backup\personal-site" fetch development` 和 `git -C "E:\AMLY\doc\repository-backup\personal-site" merge --ff-only development/main`。`development` 使用普通远端分支映射，不直接覆盖当前检出的分支，也不自动清除备份独有的历史引用。
 

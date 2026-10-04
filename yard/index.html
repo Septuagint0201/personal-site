@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#090d16" />
+    <meta name="theme-color" content="#d4e1e5" />
     <meta
       name="description"
       content="YARD is a growing collection of interactive worlds. Step inside a chapter of glass, light, and curiosity."
@@ -39,6 +39,7 @@
   </head>
   <body>
     <div class="ambient" aria-hidden="true">
+      <canvas id="glass-world"></canvas>
       <div class="ambient-orbit"></div>
       <div class="ambient-orbit orbit-two"></div>
       <i class="star star-one">✦</i><i class="star star-two">✧</i>
@@ -72,7 +73,7 @@
             class="card-stage"
             id="card-stage"
             tabindex="0"
-            aria-label="Chapter preview. Swipe or use left and right arrow keys to browse."
+            aria-label="Chapter preview. Move toward the upper or lower edge to reveal a chapter. Swipe or use arrow keys to browse."
           >
             <div class="card-stack" id="cards"></div>
             <noscript
@@ -90,8 +91,8 @@
           </div>
           <div class="gallery-toolbar">
             <p class="browse-hint">
-              <span aria-hidden="true">↔</span> Swipe to wander
-              <span class="hint-dot">·</span> Move to catch the light
+              <span aria-hidden="true">↕</span> Approach an edge to explore
+              <span class="hint-dot">·</span> Click to unfold
             </p>
             <div class="pagination">
               <span id="page-current">01</span
@@ -100,9 +101,9 @@
             </div>
             <div class="arrows">
               <button id="previous" type="button" aria-label="Previous chapter">
-                ←</button
+                ↑</button
               ><button id="next" type="button" aria-label="Next chapter">
-                →
+                ↓
               </button>
             </div>
           </div>
@@ -123,7 +124,7 @@
     </main>
     <footer class="collection-footer">
       <span
-        >An ongoing collection <i aria-hidden="true">✧</i> One chapter open.
+        >An ongoing collection <i aria-hidden="true">✧</i> Two chapters open.
         More to come.</span
       ><span>MADE TO BE EXPLORED</span>
     </footer>

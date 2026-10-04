@@ -1,26 +1,27 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 
 const palettes = {
-  prism: { glass: 0xe1f4ff, light: 0x83e8f5, rim: 0xb692fa },
-  halo: { glass: 0xffedd8, light: 0xffc780, rim: 0xec8cba },
-  orbit: { glass: 0xd8ffef, light: 0x83edcc, rim: 0x8ab7ff },
+  prism: { glass: 0xf6fcff, light: 0x83e8f5, rim: 0xb692fa },
+  halo: { glass: 0xfffaf5, light: 0xffc780, rim: 0xec8cba },
+  orbit: { glass: 0xf2fff9, light: 0x83edcc, rim: 0x8ab7ff },
 };
 
 const atmospheres = {
-  moonlight: { tint: 0x406185, base: 0x080d18, key: 0xa1dfff, rim: 0xb692fa, ambient: 0xc8d8ff, exposure: 1, glow: 0.21 },
-  daybreak: { tint: 0xb77c67, base: 0x1b1010, key: 0xffcc94, rim: 0xed9bbd, ambient: 0xffd8b0, exposure: 1.1, glow: 0.3 },
-  aurora: { tint: 0x348d83, base: 0x051716, key: 0x8affc7, rim: 0x9a88ff, ambient: 0x9fffe3, exposure: 0.95, glow: 0.34 },
+  moonlight: { tint: 0xb7c8ef, base: 0xc4d3e3, key: 0xa9e9ff, rim: 0xe4a9d3, ambient: 0xdce5ff, exposure: 0.86, glow: 0.32 },
+  daybreak: { tint: 0xf2b4a0, base: 0xe6d7c9, key: 0xffdab0, rim: 0xd8a9ed, ambient: 0xffecd5, exposure: 0.89, glow: 0.4 },
+  aurora: { tint: 0x96d6c9, base: 0xc1d9d3, key: 0xb1f2d9, rim: 0xb6b4ed, ambient: 0xcff4e5, exposure: 0.84, glow: 0.35 },
 };
 
 export function createPlayground(stage, { onHit, onHold, onStatus, onError }) {
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
-  renderer.setClearColor(0x080c14);
+  renderer.setClearColor(0xc4d3e3);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.15;
-  renderer.transmissionResolutionScale = 0.75;
+  renderer.transmissionResolutionScale = 0.9;
   renderer.domElement.setAttribute('aria-hidden', 'true');
   stage.append(renderer.domElement);
 
@@ -40,14 +41,17 @@ export function createPlayground(stage, { onHit, onHold, onStatus, onError }) {
   controls.target.set(0, 0, 0);
 
   const studio = new THREE.Scene();
-  studio.background = new THREE.Color(0x34445e);
+  studio.background = new THREE.Color(0x667789);
   const panelGeometry = new THREE.PlaneGeometry(1, 1);
   const panels = [];
   for (const [position, size, color, intensity] of [
-    [[-4, 2, 3], [1.5, 9], 0x6ad7ff, 3],
-    [[4, 1, -1], [2, 8], 0xcc91ff, 3],
-    [[0, 5, 0], [7, 2], 0xeef9ff, 5],
-    [[1, 1, 5], [0.5, 6], 0xffffff, 4],
+    [[-4, 2, 3], [1.2, 9], 0x96e8ff, 3.8],
+    [[4, 1, -1], [1.4, 8], 0xf5a2d3, 3.2],
+    [[0, 5, 0], [7, 2], 0xfffaf2, 4],
+    [[1, 1, 5], [0.35, 6], 0xffffff, 5],
+    [[-2.4, 0, 5], [1.25, 8], 0x132239, 0.3],
+    [[3.4, 0, 4], [0.7, 9], 0x152132, 0.2],
+    [[-3, -2, -3], [6, 1.3], 0xffa97a, 2],
   ]) {
     const panel = new THREE.Mesh(panelGeometry, new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }));
     panel.material.color.multiplyScalar(intensity);
@@ -58,7 +62,7 @@ export function createPlayground(stage, { onHit, onHold, onStatus, onError }) {
     panels.push(panel);
   }
   const pmrem = new THREE.PMREMGenerator(renderer);
-  const environment = pmrem.fromScene(studio, 0.035);
+  const environment = pmrem.fromScene(studio, 0.015);
   scene.environment = environment.texture;
   for (const panel of panels) panel.material.dispose();
   panelGeometry.dispose();
@@ -66,21 +70,26 @@ export function createPlayground(stage, { onHit, onHold, onStatus, onError }) {
 
   const sky = new THREE.Mesh(new THREE.SphereGeometry(32, 32, 20), new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false,
-    uniforms: { tint: { value: new THREE.Color(0x406185) }, base: { value: new THREE.Color(0x080d18) }, glowStrength: { value: 0.21 } },
+    uniforms: { tint: { value: new THREE.Color(0xb7c8ef) }, base: { value: new THREE.Color(0xc4d3e3) }, glowStrength: { value: 0.32 } },
     vertexShader: 'varying vec3 vDirection; void main(){vDirection=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
     fragmentShader: `varying vec3 vDirection; uniform vec3 tint,base; uniform float glowStrength;
       void main(){
         vec3 d=normalize(vDirection);
-        float glow=pow(max(dot(d,normalize(vec3(.25,.1,-1.))),0.),6.);
-        float band=exp(-pow((d.y+.04)*13.,2.))*max(0.,-d.z);
-        vec3 c=base+tint*(glow*glowStrength+band*.065);
+        float glow=pow(max(dot(d,normalize(vec3(.45,.3,-1.))),0.),3.);
+        float band=exp(-pow((d.y+.04)*7.,2.))*max(0.,-d.z);
+        float ribbon=exp(-pow((d.x-d.y*.55-.2)*5.,2.));
+        vec3 c=mix(base*.72,vec3(.94,.96,1.),smoothstep(-.4,.7,d.y)*.65);
+        c=mix(c,tint*.72,ribbon*.42)+tint*glow*glowStrength;
+        c+=vec3(.24,.11,.08)*band*.55;
+        float fins=pow(.5+.5*cos(atan(d.z,d.x)*36.),42.);
+        c=mix(c,c*.45,fins*.25*(1.-smoothstep(.15,.8,abs(d.y))));
         gl_FragColor=vec4(c,1.);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
   }));
   scene.add(sky);
-  const ambient = new THREE.AmbientLight(0xc8d8ff, 0.3);
+  const ambient = new THREE.AmbientLight(0xc8d8ff, 0.65);
   scene.add(ambient);
   const key = new THREE.DirectionalLight(0xcdf7ff, 4.5);
   const keyRestColor = new THREE.Color(0xcdf7ff);
@@ -91,14 +100,81 @@ export function createPlayground(stage, { onHit, onHold, onStatus, onError }) {
   cursorLight.position.set(1.5, 1.5, 3);
   scene.add(key, rim, cursorLight);
 
+  // Opaque architecture is present in the transmission buffer: its fine lines
+  // actually bend through the glass instead of being painted onto the object.
+  const galleryUniforms = {
+    tint: { value: new THREE.Color(0xb7c8ef) },
+    accent: { value: new THREE.Color(0xe4a9d3) },
+  };
+  const galleryWall = new THREE.Mesh(new THREE.PlaneGeometry(30, 18), new THREE.ShaderMaterial({
+    uniforms: galleryUniforms,
+    vertexShader: 'varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+    fragmentShader: `varying vec2 vUv; uniform vec3 tint,accent;
+      void main(){
+        vec2 p=(vUv-.5)*vec2(30.,18.);
+        vec3 c=mix(vec3(.59,.64,.59),vec3(.17,.45,.54),smoothstep(-4.,6.,p.x));
+        c=mix(c,tint,.3);
+        float arch=length(vec2((p.x-1.)*.87,max(p.y-.3,0.)));
+        float archBand=1.-smoothstep(.025,.075,abs(arch-3.5));
+        float outerBand=1.-smoothstep(.035,.08,abs(arch-3.83));
+        float innerGlow=exp(-pow((arch-3.15)*3.,2.));
+        c=mix(c,accent*.72,innerGlow*.35);
+        c=mix(c,vec3(.94,.9,.78),archBand*.95);
+        c=mix(c,vec3(.25,.36,.41),outerBand*.5);
+        float aperture=(1.-smoothstep(2.95,3.08,arch))*smoothstep(-3.6,-3.4,p.y);
+        vec3 window=mix(vec3(.09,.39,.51),accent*.38,smoothstep(-2.,3.,p.x+p.y));
+        window+=vec3(.05,.08,.09)*smoothstep(-2.,3.,p.y);
+        c=mix(c,window,aperture*.94);
+        float ribs=1.-smoothstep(.025,.07,abs(fract((p.x+4.)*1.25)-.5));
+        float crossbar=1.-smoothstep(.02,.055,abs(fract((p.y+1.)*.63)-.5));
+        c=mix(c,vec3(.018,.05,.08),ribs*aperture*.52);
+        c=mix(c,vec3(.92,.94,.88),crossbar*aperture*.7);
+        float diagonal=exp(-pow((p.y-p.x*.36-1.8)*1.1,2.));
+        c+=vec3(.21,.17,.08)*diagonal;
+        float leftVeil=1.-smoothstep(-7.,-2.,p.x);
+        c=mix(c,vec3(.7,.75,.72),leftVeil*.7);
+        gl_FragColor=vec4(c,1.);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
+  }));
+  galleryWall.position.set(0, 1.5, -6);
+  scene.add(galleryWall);
+
+  const architecture = new THREE.Group();
+  const silver = new THREE.MeshStandardMaterial({ color: 0xe2e5e0, metalness: 0.65, roughness: 0.21 });
+  const pearl = new THREE.MeshStandardMaterial({ color: 0xede8e0, metalness: 0.05, roughness: 0.28 });
+  for (let i = 0; i < 3; i++) {
+    const arch = new THREE.Mesh(new THREE.TorusGeometry(3.05 + i * 0.25, 0.023, 8, 96, Math.PI), silver);
+    arch.position.set(0.65, 0.4, -4.5 - i * 0.15);
+    architecture.add(arch);
+    for (const side of [-1, 1]) {
+      const column = new THREE.Mesh(new THREE.CylinderGeometry(0.023, 0.023, 4.4, 8), silver);
+      column.position.set(0.65 + side * (3.05 + i * 0.25), -1.8, -4.5 - i * 0.15);
+      architecture.add(column);
+    }
+  }
+  const roomFloor = new THREE.Mesh(new THREE.PlaneGeometry(65, 65), pearl);
+  roomFloor.rotation.x = -Math.PI / 2;
+  roomFloor.position.y = -1.86;
+  architecture.add(roomFloor);
+  const plinth = new THREE.Mesh(new THREE.CylinderGeometry(2.58, 2.58, 0.07, 96), new THREE.MeshStandardMaterial({ color: 0xe4deda, metalness: 0.35, roughness: 0.18 }));
+  plinth.position.y = -1.83;
+  architecture.add(plinth);
+  const plinthRim = new THREE.Mesh(new THREE.TorusGeometry(2.58, 0.011, 6, 120), silver);
+  plinthRim.rotation.x = Math.PI / 2;
+  plinthRim.position.y = -1.79;
+  architecture.add(plinthRim);
+  scene.add(architecture);
+
   const materials = [];
   function glass(thickness = 1.6) {
     const material = new THREE.MeshPhysicalMaterial({
-      color: 0xe1f4ff, roughness: 0.035, metalness: 0,
-      transmission: 1, thickness, ior: 1.5, dispersion: 0.6,
-      attenuationColor: new THREE.Color(0xb6dcff), attenuationDistance: 8,
-      clearcoat: 0.25, clearcoatRoughness: 0.055, envMapIntensity: 0.8, specularIntensity: 0.7,
-      iridescence: 0.22, iridescenceIOR: 1.3, iridescenceThicknessRange: [100, 350],
+      color: 0xf6fcff, roughness: 0.018, metalness: 0,
+      transmission: 1, thickness, ior: 1.5, dispersion: 1.1,
+      attenuationColor: new THREE.Color(0xc4efff), attenuationDistance: 12,
+      clearcoat: 1, clearcoatRoughness: 0.035, envMapIntensity: 1.2, specularIntensity: 1,
+      iridescence: 0.12, iridescenceIOR: 1.3, iridescenceThicknessRange: [100, 400],
     });
     materials.push(material);
     return material;
@@ -115,13 +191,24 @@ export function createPlayground(stage, { onHit, onHold, onStatus, onError }) {
     exhibits[name] = { group, mesh };
     return group;
   }
-  exhibit('prism', new THREE.IcosahedronGeometry(1.46, 0), 2.7);
+  // Inset each broad face before taking its hull: the edge bevels are real
+  // geometry, so even a still frame has narrow, sharply lit crystal shoulders.
+  const crystalBase = new THREE.IcosahedronGeometry(1.48, 0);
+  const crystalPoints = [];
+  const crystalPosition = crystalBase.getAttribute('position');
+  for (let i = 0; i < crystalPosition.count; i += 3) {
+    const corners = [0, 1, 2].map(j => new THREE.Vector3().fromBufferAttribute(crystalPosition, i + j));
+    const center = corners.reduce((sum, corner) => sum.add(corner), new THREE.Vector3()).multiplyScalar(1 / 3);
+    crystalPoints.push(...corners.map(corner => corner.lerp(center, 0.055)));
+  }
+  crystalBase.dispose();
+  exhibit('prism', new ConvexGeometry(crystalPoints), 4.1);
   exhibits.prism.mesh.rotation.set(0.25, 0.3, 0.1);
-  const edge = new THREE.LineSegments(new THREE.EdgesGeometry(exhibits.prism.mesh.geometry), new THREE.LineBasicMaterial({ color: 0xcef3ff, transparent: true, opacity: 0.18 }));
+  const edge = new THREE.LineSegments(new THREE.EdgesGeometry(exhibits.prism.mesh.geometry), new THREE.LineBasicMaterial({ color: 0xf6feff, transparent: true, opacity: 0.34 }));
   exhibits.prism.mesh.add(edge);
-  exhibit('halo', new THREE.TorusKnotGeometry(0.88, 0.28, 160, 24, 2, 3), 1.15);
-  exhibit('orbit', new THREE.SphereGeometry(1.12, 64, 48), 2.3);
-  const orbitRing = new THREE.Mesh(new THREE.TorusGeometry(1.68, 0.12, 16, 128), glass(0.7));
+  exhibit('halo', new THREE.TorusKnotGeometry(0.88, 0.34, 160, 32, 2, 3), 1.8);
+  exhibit('orbit', new THREE.SphereGeometry(1.12, 64, 48), 3.3);
+  const orbitRing = new THREE.Mesh(new THREE.TorusGeometry(1.68, 0.16, 20, 128), glass(1));
   orbitRing.rotation.x = 1.1;
   orbitRing.rotation.y = 0.3;
   orbitRing.userData.touchable = true;
@@ -130,7 +217,8 @@ export function createPlayground(stage, { onHit, onHold, onStatus, onError }) {
   // A luminous filament behind the glass makes refraction visible as the view changes.
   const filament = new THREE.Mesh(new THREE.TorusGeometry(0.78, 0.012, 8, 96), new THREE.MeshBasicMaterial({ color: 0x80dbf4 }));
   filament.rotation.set(0.6, 0.25, 0.3);
-  filament.position.z = -0.9;
+  filament.position.set(0.3, 0.15, -2.5);
+  filament.scale.setScalar(1.7);
   scene.add(filament);
 
   // Drawn light paths make each material study legible; these are an optical
@@ -169,7 +257,7 @@ export function createPlayground(stage, { onHit, onHold, onStatus, onError }) {
 
   const floorUniforms = { time: { value: 0 }, clock: { value: 0 }, pulse: { value: -100 }, tint: { value: new THREE.Color(0x60d8ee) }, energy: { value: 0.65 } };
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(28, 28), new THREE.ShaderMaterial({
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    transparent: true, depthWrite: false,
     uniforms: floorUniforms,
     vertexShader: 'varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
     fragmentShader: `varying vec2 vUv; uniform float time,clock,pulse,energy; uniform vec3 tint;
@@ -183,14 +271,16 @@ export function createPlayground(stage, { onHit, onHold, onStatus, onError }) {
         float wave=exp(-pow((r-age*2.6)*10.,2.))*exp(-age*1.4)*step(0.,age);
         float glow=exp(-r*r*.8)*.08;
         vec3 rainbow=.6+.4*cos(a+vec3(0.,2.,4.));
-        vec3 c=mix(tint,rainbow,.28)*(ring+folds+glow+wave*.7)*(.35+energy);
-        gl_FragColor=vec4(c,clamp(exp(-r*.12),0.,1.));
+        float light=(ring+folds+glow+wave*.7)*(.35+energy);
+        float shade=exp(-r*r*.9)*.18;
+        vec3 c=mix(vec3(.18,.25,.32),mix(tint,rainbow,.65)*1.2,light/(light+shade+.001));
+        gl_FragColor=vec4(c,clamp(light*1.5+shade,0.,.7));
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
   }));
   floor.rotation.x = -Math.PI / 2;
-  floor.position.y = -1.8;
+  floor.position.y = -1.775;
   scene.add(floor);
 
   // Point sprites have a soft circular falloff, rather than square pixels.
@@ -236,7 +326,7 @@ export function createPlayground(stage, { onHit, onHold, onStatus, onError }) {
   let mode = 'prism', atmosphere = 'moonlight', paused = motion.matches, failed = false, disposed = false, rendering = false;
   let time = 0, motionTime = 0, previousTime = 0, raf = 0, activityUntil = 0, sparkAge = 9;
   let gravityUntil = 0, resonanceUntil = 0, constellationUntil = 0;
-  let baseDispersion = 0.66, lightValue = 0.65, qualityScale = 1;
+  let baseDispersion = 1.1, lightValue = 0.65, qualityScale = 1;
   let frameSamples = 0, frameElapsed = 0, adaptationDone = false;
   const impulse = new THREE.Vector3();
   const offset = new THREE.Vector3();
@@ -286,6 +376,8 @@ export function createPlayground(stage, { onHit, onHold, onStatus, onError }) {
     sky.material.uniforms.tint.value.setHex(lighting.tint);
     sky.material.uniforms.base.value.setHex(lighting.base);
     sky.material.uniforms.glowStrength.value = lighting.glow;
+    galleryUniforms.tint.value.setHex(lighting.tint);
+    galleryUniforms.accent.value.setHex(lighting.rim);
     setLight(lightValue);
   }
   function setScene(next) {
@@ -338,15 +430,15 @@ export function createPlayground(stage, { onHit, onHold, onStatus, onError }) {
   }
   function setLight(value) {
     lightValue = Math.min(1, Math.max(0, value));
-    key.intensity = 1.5 + lightValue * 5;
-    rim.intensity = 2 + lightValue * 5;
+    key.intensity = 1 + lightValue * 3;
+    rim.intensity = 1.6 + lightValue * 3.8;
     cursorLight.intensity = 3 + lightValue * 17;
     renderer.toneMappingExposure = (0.9 + lightValue * 0.45) * atmospheres[atmosphere].exposure;
     floorUniforms.energy.value = lightValue;
     invalidate();
   }
   function setDispersion(value) {
-    baseDispersion = Math.max(0.001, value * 1.2);
+    baseDispersion = Math.max(0.001, value * 3);
     for (const material of materials) material.dispersion = baseDispersion;
     invalidate();
   }
