@@ -4,7 +4,7 @@ Live: https://yard.septuagint21.org/
 
 This is the `yard/` subproject of the personal-site repository. Run the commands below from this directory. It is deployed at the YARD domain root independently of the Candy homepage; the absolute paths in its pages are not intended for a `/yard/` URL prefix.
 
-A self-hosted chapter collection. The root is a crystal-card directory; Chapter 01 at `/chapters/01/` is a full-screen Three.js optical playground with three works sharing a world-space orbit. Chapter 02 at `/chapters/02/` contains three liquid-glass studies: Chrysalis (carved folded crystal), Nave (liquid vaults), and Undertow (falling glass curtains). All runtime dependencies are bundled locally. No accounts, analytics, remote textures, or external font requests are required.
+A self-hosted chapter collection. The root is a crystal-card directory; Chapter 01 at `/chapters/01/` is a full-screen Three.js optical playground with three works sharing a world-space orbit. Chapter 02 at `/chapters/02/` is The weight of light: a walkable dark chamber of mirrored frames, freely drifting liquid glass and three discoveries. All runtime dependencies are bundled locally. No accounts, analytics, remote textures, or external font requests are required.
 
 ## Collection and adding chapters
 
@@ -12,9 +12,11 @@ The directory is a fixed, single-viewport window onto a Y/Z ring with a horizont
 
 `src/menu-orbit-geometry.js` measures exposure against actual viewport bounds. Transparent stage/stack containers do not intercept pointer hits from cards behind their 3D planes. The physical spring pauses while the entry link is hovered, and mouse focus on a side card does not trigger a second preview movement. Coordinate-click regression checks must enter the link after a nonzero pointer preview; a semantic click at rest alone cannot detect the browser's old 3D hit-plane problem.
 
+The ring bows toward the other side: its centre is at depth `+R`, the camera is at `+4R`, and the selected station stays at depth zero. The camera remains outside the circle. Radius, camera-to-main-card distance and screen-edge exposure are unchanged when the curvature flips.
+
 `src/ring-navigation.js` is shared with Chapter 01. It accepts equally or unequally spaced angular stops, keeps rotation continuous across wraparound, and separates pointer preview from selection. Directional inputs always advance exactly one stop, including when the collection grows beyond three items. `src/interaction.css` supplies hover scaling, highlights, and press scaling to DOM controls. `src/glass-arrows.js` renders pure triangular lenses from the live canvas behind each control using the approved Candy glass shoulder/IOR/thickness/dispersion profile.
 
-`src/chapters.js` is the chapter manifest; `src/menu.js`, `src/menu.css`, and `src/menu-glass.js` render the collection. Chapters 01 and 02 are published. Entry 03 remains a clearly labelled placeholder with no destination. The three Chapter 02 studies are candidates for later refinement or promotion into a future chapter. Covers are local code-native SVG artwork in `public/covers/`.
+`src/chapters.js` is the chapter manifest; `src/menu.js`, `src/menu.css`, and `src/menu-glass.js` render the collection. Chapters 01 and 02 are published. Entry 03 remains a clearly labelled placeholder with no destination. Covers are local code-native SVG artwork in `public/covers/`.
 
 To publish another chapter, add its HTML at `chapters/NN/index.html`, add it to the `pages` map in `vite.config.js`, and update its manifest entry with the real title, cover, description and `href`. The build automatically creates a sibling `yard.html` for every HTML entry to match the existing Nginx directory index. Keep an All chapters link in each experience. The collection links to https://candy-spt.com/; the Candy homepage links back to the collection.
 
@@ -36,6 +38,7 @@ Development: http://127.0.0.1:5178/. Production output: `dist/`. The build emits
 - Drag the empty room to look around; drag the focused glass to turn its facets, then release for inertia. Pointer movement gently previews a track turn and moves a local light.
 - Click a waiting object to move one station toward its screen direction, rather than jumping directly to that object's index. Left/Right, the wheel, and the two live refracting glass triangles use the same directional step.
 - Moonlight is the fixed environment. Light intensity and dispersion remain adjustable. Show light paths adds an illustrative optical spectrum.
+- On mobile, Pulse, Pause and Reset always remain visible. The compact switch only folds the Light intensity and Dispersion sliders; opening them does not move the action row.
 - Field notes contains material descriptions and prompts for each study, a saved discovery collection with replay buttons, and the gesture/keyboard guide. The footer discovery counter opens the collection directly.
 - Tap a glass object or send a pulse for light waves and particles.
 - Sound is off on every page load. Enabling it starts quiet synthesized glass chimes; no audio files are fetched.
@@ -44,11 +47,13 @@ Development: http://127.0.0.1:5178/. Production output: `dist/`. The build emits
 
 ## Chapter 02 interaction
 
-- Select Chrysalis, Nave, or Undertow; all three are implemented studies.
-- Drag to orbit, scroll/pinch to move closer, and double-click/double-tap for a ripple. Nave allows approaching and moving through the glass vaults.
-- Flow changes fluid motion; Dispersion separates the spectral paths. Pause motion stops the sculpture; Reset view restores the camera.
-- Keys 1–3 select a study, arrows orbit, Space pauses, and R resets. Inside the glass explains the renderer and controls.
-- High is the default quality and keeps its resolution. Ultra increases resolution and optical depth. Adaptive is an explicit option for devices that prefer responsiveness.
+- Walk with W/A/S/D; drag the room or use arrow keys to look. The camera collides with a continuous body capsule against the round metal framework and walls. Entrance restores the camera without resetting the glass.
+- Mobile uses a virtual movement joystick on the left and drag-look on the right. Pulse, hold-Gather and Split buttons stay visible. Pointer cancellation, blur, hidden tabs and dialogs release movement and held actions.
+- Aim at a reachable drop, then press E/Pulse to disturb it, hold Q/Gather to attract nearby liquid, or F/Split to divide a sufficiently large free drop. Aim at the etched mark to touch it. Glass and controls respond to hover, pressure and selection.
+- Eight long rectangular emitters occupy all four walls. Twenty-four round-section metal segments form six connected, intersecting frames and eighteen condensation bends.
+- Drops condense at bends, stretch free, drift in different directions, coalesce, divide when large, and flow along a new rod before returning to the frame. There is no shared gravity or travel direction. Total glass volume is conserved; the number of drops can change. Temporarily absorbed liquid is accounted for in a reservoir and reappears at another bend.
+- Ultra is the desktop default; High is the mobile default. Pause stops liquid motion while leaving the viewpoint and controls usable. Sound is off until explicitly enabled.
+- Field notes includes interaction hints and exactly three persistent discoveries. Resonance follows five distinct pulses within eight seconds; Constellation follows three nearby drops held together for three seconds; Afterimage responds to the far-wall mark. Effects can be replayed from the discovered entries. Only the three IDs persist in localStorage.
 
 ## Rendering and accessibility
 
@@ -56,7 +61,11 @@ The menu uses a shared procedural architectural background and WebGL screen-spac
 
 Chapter 01 uses physically based raster rendering with MeshPhysicalMaterial transmission, thickness, Fresnel reflection, dispersion, an environment map, and real-time lights. Beveled geometry and a bright architectural room provide visible detail through the glass. Ground caustics are an artistic procedural approximation.
 
-Chapter 02 compiles each signed-distance study separately and traces wavelength-dependent light paths across six glass boundaries in High or eight in Ultra, including subsequent volumes, total internal reflection and Beer absorption. Reflection contributions sample the HDR procedural room; this is bounded ray tracing rather than a global-illumination path tracer. Floor caustics and floor reflections are artistic approximations. Fluid shapes are procedural animation, not a fluid-physics solver. Shader preparation is asynchronous where supported. High uses native CSS-pixel resolution up to 2.4 million pixels; Ultra can use up to 6.5 million pixels. A separate FXAA resolve smooths edges. Resolution is automatically reduced only in the user-selected Adaptive mode.
+Chapter 02 traces the actual room, mirror capsules and deforming glass ellipsoids. Coalescing/splitting pairs have local smooth-distance necks. Three wavelengths follow refraction, total internal reflection and thickness absorption; mirror reflections can see other frames and drops. The main path uses five interactions in High and eight in Ultra, with shorter secondary reflection branches. Rectangular emitters are visible to the rays; diffuse room lighting uses an analytic area approximation. This is bounded ray tracing, not full global-illumination path tracing. HDR, neighbourhood-clamped temporal antialiasing, FXAA and restrained bloom resolve the narrow light reflections.
+
+`src/liquid-simulation.js` is a deterministic 120 Hz mass-conserving parcel simulation, not a Navier–Stokes fluid solver. Sphere-equivalent volumes and volume-preserving deformations drive the optical surfaces. `src/liquid-room.js` shares geometry among tracing, simulation and camera collision. `src/liquid-camera.js` uses continuous segment/capsule distances, horizontal sliding and small movement substeps. Up to sixteen simultaneous parcels bound the shader workload; coalescence frees room for later divisions without losing material.
+
+Shader preparation is asynchronous where supported. High uses up to 1.5 device pixels per CSS pixel and a 2.4 million-pixel budget. Ultra uses a larger supersampled buffer, capped at 5.8 million pixels. Neither setting silently reduces resolution according to frame rate. Temporal history resets when the camera moves or resolution changes; paused frames settle, then stop drawing.
 
 Rendering and audio suspend when the document is hidden. Reduced-motion preference starts in a static scene; manual camera/material changes and selection still work. Native controls and dialog support keyboard use. A renderer failure/context loss shows a recovery view; JavaScript-disabled browsers get a static explanation and a link to the personal site.
 
@@ -73,4 +82,4 @@ The original welcome page is preserved in the first deployment backup. Roll back
 
 ## Verification
 
-Run `node --test tests/*.test.js` for directional-step, wraparound, uneven-stop, pointer-preview, viewport clipping, card separation and reduced-motion invariants. Production build and JavaScript syntax are checked before deployment. Browser checks cover actual orbit exposure, coordinate clicks after preview, view turning, direct sculpture manipulation, chapter variants, controls and responsive layouts. Actual performance depends on GPU/browser and is not a guaranteed frame rate.
+Run `node --test tests/*.test.js` for orbit/clipping, body collision, liquid lifecycle, deterministic frame-rate independence, five-minute volume conservation and discovery timing. Production build and JavaScript syntax are checked before deployment. Browser checks cover coordinate clicks after preview, room walking, Gather/release, the far-wall interaction, mobile controls, quality defaults and responsive layouts. Actual performance depends on GPU/browser and is not a guaranteed frame rate.

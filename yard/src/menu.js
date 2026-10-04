@@ -141,8 +141,8 @@ function paint() {
     const logical = navigator.angle(i);
     const angle = orbitalAngle(logical);
     const y = geometry.radius * Math.sin(angle);
-    const z = geometry.radius * (Math.cos(angle) - 1);
-    const pitch = (angle * 180) / Math.PI;
+    const z = geometry.radius * (1 - Math.cos(angle));
+    const pitch = (-angle * 180) / Math.PI;
     const active = i === navigator.index;
     const front = Math.abs(angle) < Math.PI * 0.56;
     const direction = logical < 0 ? -1 : 1;

@@ -25,14 +25,14 @@ export function createViewportRingGeometry({
   const step = TAU / count;
 
   // Coordinates are relative to the viewport centre. This matches CSS
-  // translate3d(0, R sin θ, R(cos θ − 1)) rotateX(θ) with central perspective.
+  // translate3d(0, R sin θ, R(1 − cos θ)) rotateX(−θ) with central perspective.
   function projectEdges(theta) {
     const sin = Math.sin(theta);
     const cos = Math.cos(theta);
     return [-cardHeight / 2, cardHeight / 2].map(
       (edge) =>
         (perspective * (radius * sin + edge * cos)) /
-        (perspective - radius * (cos - 1) - edge * sin),
+        (perspective - radius * (1 - cos) + edge * sin),
     );
   }
 

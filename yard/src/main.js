@@ -121,7 +121,7 @@ $('#controls-toggle').addEventListener('click', () => {
   const button = $('#controls-toggle');
   const expanded = button.getAttribute('aria-expanded') !== 'true';
   button.setAttribute('aria-expanded', String(expanded));
-  button.setAttribute('aria-label', expanded ? 'Collapse light controls' : 'Expand light controls');
+  button.setAttribute('aria-label', expanded ? 'Hide light and dispersion sliders' : 'Show light and dispersion sliders');
 });
 const help = $('#help-dialog');
 function chooseNotesTab(name, focus = false) {

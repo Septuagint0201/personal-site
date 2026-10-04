@@ -1,27 +1,60 @@
-import { vertexSource, fragmentSource } from "./chapter02-shaders.js";
-const resolveSource = `#version 300 es
-precision highp float;
-uniform sampler2D image;
-uniform vec2 resolution;
-out vec4 outColor;
-void main(){
- vec2 uv=gl_FragCoord.xy/resolution,px=1./resolution;
- vec3 c=texture(image,uv).rgb,nw=texture(image,uv+vec2(-1.,1.)*px).rgb;
- vec3 ne=texture(image,uv+px).rgb,sw=texture(image,uv-px).rgb,se=texture(image,uv+vec2(1.,-1.)*px).rgb;
- vec3 luma=vec3(.299,.587,.114);
- float m=dot(c,luma),a=dot(nw,luma),b=dot(ne,luma),d=dot(sw,luma),e=dot(se,luma);
- float lo=min(m,min(min(a,b),min(d,e))),hi=max(m,max(max(a,b),max(d,e)));
- vec2 dir=vec2(-((a+b)-(d+e)),(a+d)-(b+e));
- float reduce=max((a+b+d+e)*.03125,.0078125);
- dir=clamp(dir/(min(abs(dir.x),abs(dir.y))+reduce),vec2(-6.),vec2(6.))*px;
- vec3 first=.5*(texture(image,uv+dir*(-1./6.)).rgb+texture(image,uv+dir*(1./6.)).rgb);
- vec3 second=first*.5+.25*(texture(image,uv-dir*.5).rgb+texture(image,uv+dir*.5).rgb);
- float l=dot(second,luma);
- outColor=vec4((hi-lo<.045)?c:((l<lo||l>hi)?first:second),1.);
-}`;
+import {
+  vertexSource,
+  traceSource,
+  temporalSource,
+  resolveSource,
+} from "./chapter02-shaders.js";
+import { createLiquidSimulation, MAX_DROPS } from "./liquid-simulation.js";
+import { AREA_LIGHTS, METAL_SEGMENTS } from "./liquid-room.js";
+import { moveWalkingCamera } from "./liquid-camera.js";
+
+const subtract = (a, b) => a.map((x, i) => x - b[i]);
+const dot = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
+const addScaled = (a, b, t) => a.map((x, i) => x + b[i] * t);
+const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+function raySphere(origin, direction, center, radius) {
+  const o = subtract(origin, center),
+    b = dot(o, direction),
+    c = dot(o, o) - radius * radius,
+    h = b * b - c;
+  if (h < 0) return Infinity;
+  const t = -b - Math.sqrt(h);
+  return t > 0.001 ? t : Infinity;
+}
+function rayRod(origin, direction, rod) {
+  const ba = subtract(rod.b, rod.a),
+    oa = subtract(origin, rod.a),
+    baba = dot(ba, ba),
+    bard = dot(ba, direction),
+    baoa = dot(ba, oa),
+    rdoa = dot(direction, oa);
+  const a = baba - bard * bard,
+    b = baba * rdoa - baoa * bard,
+    c = baba * dot(oa, oa) - baoa * baoa - rod.radius * rod.radius * baba;
+  let nearest = Math.min(
+    raySphere(origin, direction, rod.a, rod.radius),
+    raySphere(origin, direction, rod.b, rod.radius),
+  );
+  const h = b * b - a * c;
+  if (h >= 0 && a > 1e-8) {
+    const t = (-b - Math.sqrt(h)) / a,
+      y = baoa + t * bard;
+    if (t > 0.001 && y > 0 && y < baba) nearest = Math.min(nearest, t);
+  }
+  return nearest;
+}
+
 export function createLiquidRenderer(
   canvas,
-  { onQuality, onError, onReady, onPreparing } = {},
+  {
+    onQuality,
+    onError,
+    onReady,
+    onPreparing,
+    onStatus,
+    onEvent,
+    onTarget,
+  } = {},
 ) {
   const gl = canvas.getContext("webgl2", {
     alpha: false,
@@ -31,75 +64,119 @@ export function createLiquidRenderer(
     powerPreference: "high-performance",
   });
   if (!gl) throw new Error("WebGL 2 is unavailable.");
+  const maximumTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
   const parallel = gl.getExtension("KHR_parallel_shader_compile");
-  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
-  const programs = new Map();
-  let active,
-    buffer,
-    framebuffer,
-    texture,
-    resolveProgram,
-    resolveShaders,
-    resolveReady = false,
-    resolveUniforms;
+  const floatTarget = !!gl.getExtension("EXT_color_buffer_float");
+  const motion = matchMedia("(prefers-reduced-motion: reduce)");
+  const mobile = matchMedia("(pointer: coarse)").matches || innerWidth <= 760;
+  const state = {
+    paused: motion.matches,
+    quality: mobile ? "high" : "ultra",
+    position: [0, 1.65, 4.5],
+    yaw: 0,
+    pitch: -0.045,
+  };
   let frame = 0,
+    previous = 0,
     destroyed = false,
     lost = false,
-    failed = false;
-  let previous = 0,
-    time = 1.7,
-    ripple = 0,
-    hover = 0,
-    hoverTarget = 0,
-    press = 0;
-  let frames = 0,
-    sampleTime = 0,
-    lastInteraction = 0,
-    scale = 1,
-    pixelLimit = 2400000;
-  const state = {
-    study: 0,
-    flow: 0.55,
-    dispersion: 0.65,
-    paused: matchMedia("(prefers-reduced-motion: reduce)").matches,
-    yaw: -0.38,
-    pitch: 0.1,
-    distance: 6.1,
-    quality: "high",
-  };
+    failed = false,
+    ready = false,
+    compilationStarted = 0;
+  let trace,
+    temporal,
+    resolve,
+    buffer,
+    texture,
+    fbo,
+    targetWidth = 0,
+    targetHeight = 0;
+  let historyTextures = [],
+    historyFbos = [],
+    historyIndex = 0,
+    historyValid = false,
+    convergence = 0,
+    sampleIndex = 0;
+  let clock = 0,
+    sceneClock = 0,
+    statusClock = -1,
+    frames = 0,
+    sampleStarted = 0;
+  let movement = [0, 0],
+    gathering = false,
+    target = null,
+    effectId = null,
+    effectUntil = 0,
+    effectStarted = 0,
+    heldSeconds = 0;
+  let selectedId = null,
+    pressedId = null,
+    pressTime = -100,
+    hoverValue = 0;
+  const forward = [0, 0, -1],
+    right = [1, 0, 0],
+    up = [0, 1, 0];
+  const positions = new Float32Array(MAX_DROPS * 4),
+    shapes = new Float32Array(MAX_DROPS * 4),
+    axes = new Float32Array(MAX_DROPS * 4),
+    velocities = new Float32Array(MAX_DROPS * 4);
+  const simulation = createLiquidSimulation({
+    onEvent: (event) => {
+      onEvent?.(event);
+    },
+  });
+  let initialVolume = simulation.stats().initialVolume;
+  const listeners = [];
+  function listen(object, event, callback) {
+    object.addEventListener(event, callback);
+    listeners.push(() => object.removeEventListener(event, callback));
+  }
   function compile(type, source) {
     const shader = gl.createShader(type);
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
     return shader;
   }
-  function prepare(study) {
-    failed = false;
-    frames = 0;
-    sampleTime = 0;
-    previous = 0;
-    if (!programs.has(study)) {
-      const shaders = [
-        compile(gl.VERTEX_SHADER, vertexSource),
-        compile(gl.FRAGMENT_SHADER, fragmentSource(study)),
-      ];
-      const program = gl.createProgram();
-      shaders.forEach((shader) => gl.attachShader(program, shader));
-      gl.linkProgram(program);
-      programs.set(study, {
-        program,
-        shaders,
-        ready: false,
-        started: performance.now(),
-      });
-      gl.flush();
-      onPreparing?.();
-    }
-    active = programs.get(study);
-    active.announced = false;
+  function makeProgram(fragment) {
+    const shaders = [
+      compile(gl.VERTEX_SHADER, vertexSource),
+      compile(gl.FRAGMENT_SHADER, fragment),
+    ];
+    const program = gl.createProgram();
+    shaders.forEach((s) => gl.attachShader(program, s));
+    gl.linkProgram(program);
+    return { program, shaders, ready: false, uniforms: null, position: 0 };
+  }
+  function configure(entry, names) {
+    if (entry.ready) return true;
+    if (
+      parallel &&
+      !gl.getProgramParameter(entry.program, parallel.COMPLETION_STATUS_KHR)
+    )
+      return false;
+    if (!gl.getProgramParameter(entry.program, gl.LINK_STATUS))
+      throw new Error(
+        gl.getProgramInfoLog(entry.program) ||
+          entry.shaders.map((s) => gl.getShaderInfoLog(s)).join("\n"),
+      );
+    entry.shaders.forEach((s) => gl.deleteShader(s));
+    entry.shaders = [];
+    entry.uniforms = Object.fromEntries(
+      names.map((n) => [n, gl.getUniformLocation(entry.program, n)]),
+    );
+    entry.position = gl.getAttribLocation(entry.program, "position");
+    entry.ready = true;
+    return true;
   }
   function initialize() {
-    programs.clear();
+    ready = false;
+    failed = false;
+    compilationStarted = performance.now();
+    onPreparing?.();
+    trace = makeProgram(traceSource);
+    temporal = makeProgram(temporalSource);
+    resolve = makeProgram(resolveSource);
+    gl.flush();
     buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.bufferData(
@@ -113,8 +190,8 @@ export function createLiquidRenderer(
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    framebuffer = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
     gl.framebufferTexture2D(
       gl.FRAMEBUFFER,
       gl.COLOR_ATTACHMENT0,
@@ -123,118 +200,273 @@ export function createLiquidRenderer(
       0,
     );
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    resolveShaders = [
-      compile(gl.VERTEX_SHADER, vertexSource),
-      compile(gl.FRAGMENT_SHADER, resolveSource),
-    ];
-    resolveProgram = gl.createProgram();
-    resolveShaders.forEach((shader) => gl.attachShader(resolveProgram, shader));
-    gl.linkProgram(resolveProgram);
-    resolveReady = false;
-    prepare(state.study);
+    historyTextures = [];
+    historyFbos = [];
+    for (let i = 0; i < 2; i++) {
+      const t = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      const f = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+      gl.framebufferTexture2D(
+        gl.FRAMEBUFFER,
+        gl.COLOR_ATTACHMENT0,
+        gl.TEXTURE_2D,
+        t,
+        0,
+      );
+      historyTextures.push(t);
+      historyFbos.push(f);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    historyValid = false;
+    convergence = 0;
+    targetWidth = targetHeight = 0;
     resize();
   }
-  function finishProgram() {
-    if (!resolveReady) {
-      if (
-        parallel &&
-        !gl.getProgramParameter(resolveProgram, parallel.COMPLETION_STATUS_KHR)
-      )
-        return false;
-      if (!gl.getProgramParameter(resolveProgram, gl.LINK_STATUS))
-        throw new Error(
-          gl.getProgramInfoLog(resolveProgram) ||
-            "The antialiasing resolve could not be linked.",
-        );
-      resolveShaders.forEach((shader) => gl.deleteShader(shader));
-      resolveShaders = [];
-      resolveUniforms = {
-        resolution: gl.getUniformLocation(resolveProgram, "resolution"),
-        image: gl.getUniformLocation(resolveProgram, "image"),
-        position: gl.getAttribLocation(resolveProgram, "position"),
-      };
-      resolveReady = true;
-    }
-    if (active.ready) return true;
+  function prepare() {
     if (
-      parallel &&
-      !gl.getProgramParameter(active.program, parallel.COMPLETION_STATUS_KHR)
-    ) {
-      if (performance.now() - active.started > 90000)
-        throw new Error(
-          "The graphics driver took too long to prepare this study.",
-        );
-      return false;
-    }
-    if (!gl.getProgramParameter(active.program, gl.LINK_STATUS))
+      performance.now() - compilationStarted > 90000 &&
+      (!trace.ready || !temporal.ready || !resolve.ready)
+    )
       throw new Error(
-        gl.getProgramInfoLog(active.program) ||
-          active.shaders
-            .map((shader) => gl.getShaderInfoLog(shader))
-            .filter(Boolean)
-            .join("\n") ||
-          "The glass shader could not be linked.",
+        "The graphics driver could not finish preparing this room.",
       );
-    active.shaders.forEach((shader) => gl.deleteShader(shader));
-    active.shaders = [];
-    active.uniforms = Object.fromEntries(
-      [
+    if (
+      !configure(trace, [
         "resolution",
-        "orbit",
-        "distanceToGlass",
-        "time",
-        "flow",
-        "dispersion",
-        "ripple",
-        "compact",
-        "boundaryLimit",
-        "hover",
-        "press",
-      ].map((name) => [name, gl.getUniformLocation(active.program, name)]),
-    );
-    active.position = gl.getAttribLocation(active.program, "position");
-    active.ready = true;
+        "jitter",
+        "cameraPosition",
+        "cameraForward",
+        "cameraRight",
+        "cameraUp",
+        "rodsA[0]",
+        "rodsB[0]",
+        "rodCount",
+        "dropCount",
+        "lightCount",
+        "bounceLimit",
+        "drops[0]",
+        "shapes[0]",
+        "axes[0]",
+        "velocities[0]",
+        "lightPositions[0]",
+        "lightNormals[0]",
+        "lightTangents[0]",
+        "lightColors[0]",
+        "clock",
+        "effect",
+        "effectAge",
+        "selectedDrop",
+        "hdr",
+      ])
+    )
+      return false;
+    if (
+      !configure(temporal, [
+        "image",
+        "previousImage",
+        "resolution",
+        "historyWeight",
+      ])
+    )
+      return false;
+    if (!configure(resolve, ["image", "resolution", "hdr"])) return false;
+    if (!ready) {
+      const u = trace.uniforms;
+      gl.useProgram(trace.program);
+      const rodA = new Float32Array(32 * 4),
+        rodB = new Float32Array(32 * 4);
+      METAL_SEGMENTS.forEach((s, i) => {
+        rodA.set([...s.a, s.radius], i * 4);
+        rodB.set([...s.b, 0], i * 4);
+      });
+      gl.uniform4fv(u["rodsA[0]"], rodA);
+      gl.uniform4fv(u["rodsB[0]"], rodB);
+      gl.uniform1i(u.rodCount, METAL_SEGMENTS.length);
+      const lp = new Float32Array(32),
+        ln = new Float32Array(32),
+        lt = new Float32Array(32),
+        lc = new Float32Array(32);
+      AREA_LIGHTS.forEach((l, i) => {
+        lp.set([...l.center, l.intensity], i * 4);
+        ln.set([...l.normal, l.size[0]], i * 4);
+        lt.set([...l.tangent, l.size[1]], i * 4);
+        lc.set([...l.color, 0], i * 4);
+      });
+      gl.uniform4fv(u["lightPositions[0]"], lp);
+      gl.uniform4fv(u["lightNormals[0]"], ln);
+      gl.uniform4fv(u["lightTangents[0]"], lt);
+      gl.uniform4fv(u["lightColors[0]"], lc);
+      gl.uniform1i(u.lightCount, AREA_LIGHTS.length);
+      gl.uniform1i(u.hdr, floatTarget ? 1 : 0);
+      ready = true;
+      previous = 0;
+      sampleStarted = 0;
+      frames = 0;
+      onReady?.();
+    }
     return true;
-  }
-  function invalidate() {
-    if (!frame && !destroyed && !lost && !failed && !document.hidden)
-      frame = requestAnimationFrame(draw);
   }
   function resize() {
     if (destroyed || lost) return;
-    const rect = canvas.getBoundingClientRect(),
-      bounded = Math.min(
-        scale,
-        Math.sqrt(pixelLimit / Math.max(1, rect.width * rect.height)),
-      );
-    const width = Math.max(1, Math.round(rect.width * bounded)),
-      height = Math.max(1, Math.round(rect.height * bounded));
-    if (canvas.width !== width || canvas.height !== height) {
-      canvas.width = width;
-      canvas.height = height;
+    const rect = canvas.getBoundingClientRect();
+    const ultra = state.quality === "ultra";
+    const dpr =
+      Math.min(devicePixelRatio || 1, ultra ? 2 : 1.5) * (ultra ? 1.3 : 1);
+    const scale = Math.min(
+      dpr,
+      maximumTextureSize / Math.max(1, rect.width),
+      maximumTextureSize / Math.max(1, rect.height),
+      Math.sqrt(
+        (ultra ? 5800000 : 2400000) / Math.max(1, rect.width * rect.height),
+      ),
+    );
+    const w = Math.max(1, Math.round(rect.width * scale)),
+      h = Math.max(1, Math.round(rect.height * scale));
+    if (w !== targetWidth || h !== targetHeight) {
+      targetWidth = w;
+      targetHeight = h;
+      canvas.width = w;
+      canvas.height = h;
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      for (const image of [texture, ...historyTextures]) {
+        gl.bindTexture(gl.TEXTURE_2D, image);
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          floatTarget ? gl.RGBA16F : gl.RGBA8,
+          w,
+          h,
+          0,
+          gl.RGBA,
+          floatTarget ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE,
+          null,
+        );
+      }
+      historyValid = false;
+      convergence = 0;
     }
     invalidate();
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(
-      gl.TEXTURE_2D,
-      0,
-      gl.RGBA8,
-      width,
-      height,
-      0,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-      null,
-    );
   }
-  function draw(now) {
+  function updateCamera(dt) {
+    const cy = Math.cos(state.yaw),
+      sy = Math.sin(state.yaw),
+      cp = Math.cos(state.pitch),
+      sp = Math.sin(state.pitch);
+    forward[0] = sy * cp;
+    forward[1] = -sp;
+    forward[2] = -cy * cp;
+    right[0] = cy;
+    right[1] = 0;
+    right[2] = sy;
+    up[0] = sy * sp;
+    up[1] = cp;
+    up[2] = -cy * sp;
+    if (!movement[0] && !movement[1]) return;
+    const speed = 2.15 * dt;
+    state.position = moveWalkingCamera(state.position, [
+      (cy * movement[0] + sy * movement[1]) * speed,
+      0,
+      (sy * movement[0] - cy * movement[1]) * speed,
+    ]);
+  }
+  function updateTarget() {
+    let hit = simulation.pick(state.position, forward);
+    const obstruction = Math.min(
+      ...METAL_SEGMENTS.map((s) => rayRod(state.position, forward, s)),
+    );
+    if (hit && (hit.distance > 5.0 || obstruction < hit.distance - 0.01))
+      hit = null;
+    const glyph = [3.85, 1.28, -5.97],
+      toGlyph = subtract(glyph, state.position),
+      glyphDistance = Math.hypot(...toGlyph),
+      alignment = dot(toGlyph, forward) / Math.max(0.001, glyphDistance);
+    if (
+      glyphDistance < 2.45 &&
+      alignment > 0.982 &&
+      obstruction > glyphDistance - 0.15
+    ) {
+      target = {
+        kind: "glyph",
+        id: "far-wall",
+        label: "An etched circle",
+        distance: glyphDistance,
+      };
+      selectedId = null;
+    } else if (hit) {
+      target = {
+        kind: "drop",
+        id: hit.id,
+        label:
+          hit.drop.state === "forming"
+            ? "Condensing glass"
+            : hit.drop.state === "draining"
+              ? "Glass returning to the frame"
+              : "Liquid glass",
+        distance: hit.distance,
+      };
+      selectedId = hit.id;
+    } else {
+      target = {
+        kind: null,
+        id: null,
+        label: "Follow the light",
+        distance: Infinity,
+      };
+      selectedId = null;
+    }
+    onTarget?.(target);
+  }
+  function uploadDrops() {
+    const list = simulation.getDrops();
+    const ids = new Map(list.map((d, i) => [d.id, i]));
+    let selected = -1;
+    list.forEach((d, i) => {
+      const hover = d.id === selectedId ? hoverValue : 0;
+      const press =
+        d.id === pressedId ? Math.exp(-(clock - pressTime) * 13) : 0;
+      positions.set([...d.position, Math.max(0.001, d.radius)], i * 4);
+      const partner = ids.get(d.bridgeTo);
+      const paired = partner !== undefined && list[partner].bridgeTo === d.id;
+      shapes.set(
+        [
+          d.deform[0],
+          d.deform[2],
+          hover + (d.highlight || 0) * 0.2 - press * 1.6,
+          paired ? partner + 1 : 0,
+        ],
+        i * 4,
+      );
+      axes.set([...d.orientation, 0], i * 4);
+      velocities.set([...d.velocity, 0], i * 4);
+      if (d.id === selectedId) selected = i;
+    });
+    const u = trace.uniforms;
+    gl.uniform4fv(u["drops[0]"], positions);
+    gl.uniform4fv(u["shapes[0]"], shapes);
+    gl.uniform4fv(u["axes[0]"], axes);
+    gl.uniform4fv(u["velocities[0]"], velocities);
+    gl.uniform1i(u.dropCount, list.length);
+    gl.uniform1i(u.selectedDrop, selected);
+  }
+  function pass(entry) {
+    gl.useProgram(entry.program);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.enableVertexAttribArray(entry.position);
+    gl.vertexAttribPointer(entry.position, 2, gl.FLOAT, false, 0, 0);
+  }
+  function render(now) {
     frame = 0;
-    if (destroyed || lost || document.hidden) {
+    if (destroyed || lost || failed || document.hidden) {
       previous = 0;
       return;
     }
     try {
-      if (!finishProgram()) {
+      if (!prepare()) {
         invalidate();
         return;
       }
@@ -243,211 +475,270 @@ export function createLiquidRenderer(
       onError?.(error, false);
       return;
     }
-    if (previous && now - previous < 15.7) {
+    if (previous && now - previous < 15.4) {
       invalidate();
       return;
     }
-    const dt = previous ? Math.min((now - previous) / 1000, 0.07) : 0.016;
+    const dt = previous ? Math.min((now - previous) / 1000, 0.065) : 0.016;
     previous = now;
-    if (!state.paused) time += dt;
-    if (!state.paused) ripple *= Math.exp(-dt * 1.1);
-    hover = reducedMotion.matches
-      ? hoverTarget
-      : hover + (hoverTarget - hover) * Math.min(1, dt * 9);
-    press = reducedMotion.matches ? 0 : press * Math.exp(-dt * 13);
-    const u = active.uniforms;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-    gl.useProgram(active.program);
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.enableVertexAttribArray(active.position);
-    gl.vertexAttribPointer(active.position, 2, gl.FLOAT, false, 0, 0);
-    gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.uniform2f(u.resolution, canvas.width, canvas.height);
-    gl.uniform2f(u.orbit, state.yaw, state.pitch);
-    gl.uniform1f(u.distanceToGlass, state.distance);
-    gl.uniform1f(u.time, time);
-    gl.uniform1f(u.flow, state.flow);
-    gl.uniform1f(u.dispersion, state.dispersion);
-    gl.uniform1f(u.ripple, ripple);
-    gl.uniform1f(u.hover, hover);
-    gl.uniform1f(u.press, press);
-    gl.uniform1i(u.boundaryLimit, state.quality === "ultra" ? 8 : 6);
-    gl.uniform1i(u.compact, canvas.clientWidth < 601 ? 1 : 0);
+    clock += dt;
+    updateCamera(dt);
+    if (movement[0] || movement[1]) {
+      historyValid = false;
+      convergence = 0;
+    }
+    if (gathering) {
+      simulation.setAttractor(addScaled(state.position, forward, 1.8));
+      heldSeconds += dt;
+    } else heldSeconds = 0;
+    if (!state.paused) {
+      simulation.update(dt);
+      sceneClock += dt;
+    }
+    updateTarget();
+    hoverValue = motion.matches
+      ? selectedId !== null
+        ? 1
+        : 0
+      : hoverValue +
+        ((selectedId !== null ? 1 : 0) - hoverValue) * Math.min(1, dt * 12);
+    if (effectId && clock > effectUntil) {
+      effectId = null;
+      historyValid = false;
+      convergence = 0;
+    }
+    const u = trace.uniforms;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.viewport(0, 0, targetWidth, targetHeight);
+    pass(trace);
+    gl.uniform2f(u.resolution, targetWidth, targetHeight);
+    gl.uniform3fv(u.cameraPosition, state.position);
+    gl.uniform3fv(u.cameraForward, forward);
+    gl.uniform3fv(u.cameraRight, right);
+    gl.uniform3fv(u.cameraUp, up);
+    const jitter = [
+      [-0.25, -0.25],
+      [0.25, -0.25],
+      [-0.25, 0.25],
+      [0.25, 0.25],
+    ][sampleIndex++ % 4];
+    gl.uniform2f(u.jitter, jitter[0], jitter[1]);
+    gl.uniform1i(u.bounceLimit, state.quality === "ultra" ? 8 : 5);
+    gl.uniform1f(u.clock, sceneClock);
+    gl.uniform1i(
+      u.effect,
+      { resonance: 1, constellation: 2, afterimage: 3 }[effectId] || 0,
+    );
+    gl.uniform1f(u.effectAge, clock - effectStarted);
+    uploadDrops();
     gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.useProgram(resolveProgram);
-    gl.enableVertexAttribArray(resolveUniforms.position);
-    gl.vertexAttribPointer(resolveUniforms.position, 2, gl.FLOAT, false, 0, 0);
+    const nextHistory = 1 - historyIndex;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, historyFbos[nextHistory]);
+    pass(temporal);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.uniform1i(resolveUniforms.image, 0);
-    gl.uniform2f(resolveUniforms.resolution, canvas.width, canvas.height);
+    gl.uniform1i(temporal.uniforms.image, 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, historyTextures[historyIndex]);
+    gl.uniform1i(temporal.uniforms.previousImage, 1);
+    gl.uniform2f(temporal.uniforms.resolution, targetWidth, targetHeight);
+    gl.uniform1f(temporal.uniforms.historyWeight, historyValid ? 0.78 : 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
-    if (!active.announced) {
-      active.announced = true;
-      onReady?.();
-    }
+    historyIndex = nextHistory;
+    historyValid = true;
+    convergence++;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    pass(resolve);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, historyTextures[historyIndex]);
+    gl.uniform1i(resolve.uniforms.image, 0);
+    gl.uniform1i(resolve.uniforms.hdr, floatTarget ? 1 : 0);
+    gl.uniform2f(resolve.uniforms.resolution, targetWidth, targetHeight);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
     frames++;
-    if (!sampleTime) sampleTime = now;
-    if (now - sampleTime > 2400 && frames > 3) {
-      const fps = (frames * 1000) / (now - sampleTime);
-      if (state.quality === "adaptive") {
-        let next = scale;
-        if (fps < 28) next = Math.max(0.65, scale * 0.88);
-        else if (fps > 52 && now - lastInteraction > 3000)
-          next = Math.min(1.25, scale + 0.08);
-        if (Math.abs(next - scale) > 0.02) {
-          scale = next;
-          resize();
-        }
-      }
+    if (!sampleStarted) sampleStarted = now;
+    if (now - sampleStarted > 2500) {
       onQuality?.({
-        fps: Math.round(fps),
-        scale: canvas.width / Math.max(1, canvas.clientWidth),
-        study: state.study,
+        fps: Math.round((frames * 1000) / (now - sampleStarted)),
+        scale: targetWidth / Math.max(1, canvas.clientWidth),
         quality: state.quality,
       });
       frames = 0;
-      sampleTime = now;
+      sampleStarted = now;
     }
-    if (!state.paused || Math.abs(hover - hoverTarget) > 0.002 || press > 0.001)
+    if (clock - statusClock > 0.2) {
+      const stats = simulation.stats();
+      canvas.dataset.walkPosition = state.position
+        .map((v) => v.toFixed(3))
+        .join(",");
+      canvas.dataset.lookDirection = [state.yaw, state.pitch]
+        .map((v) => v.toFixed(3))
+        .join(",");
+      onStatus?.({
+        nearbyCount: stats.gatheredCount,
+        dropCount: stats.freeCount,
+        volumeRatio: stats.totalVolume / initialVolume,
+        volume: stats.totalVolume,
+        merges: stats.merges,
+        splits: stats.splits,
+        returns: stats.returns,
+        heldSeconds,
+      });
+      statusClock = clock;
+    }
+    if (
+      !state.paused ||
+      movement[0] ||
+      movement[1] ||
+      gathering ||
+      effectId ||
+      convergence < 12 ||
+      Math.abs(hoverValue - (selectedId !== null ? 1 : 0)) > 0.005 ||
+      clock - pressTime < 0.6
+    )
       invalidate();
     else previous = 0;
   }
-  function resetCamera() {
-    state.yaw = state.study === 1 ? 0.035 : state.study === 2 ? -0.2 : -0.38;
-    state.pitch = state.study === 1 ? 0.025 : 0.1;
-    state.distance = state.study === 1 ? 6.4 : state.study === 2 ? 6.8 : 6.1;
+  function invalidate() {
+    if (!frame && !destroyed && !lost && !failed && !document.hidden)
+      frame = requestAnimationFrame(render);
+  }
+  function setGathering(value) {
+    gathering = Boolean(value);
+    if (!gathering) {
+      simulation.setAttractor(null);
+      heldSeconds = 0;
+    }
     invalidate();
   }
-  function floorLimit() {
-    state.pitch = Math.max(
-      Math.max(-0.4, Math.asin(Math.max(-1, -1.75 / state.distance))),
-      state.pitch,
-    );
-  }
-  function visibility() {
+  function onVisibility() {
     previous = 0;
     frames = 0;
-    sampleTime = 0;
+    sampleStarted = 0;
     if (document.hidden) {
+      movement = [0, 0];
+      setGathering(false);
       cancelAnimationFrame(frame);
       frame = 0;
     } else invalidate();
   }
-  function contextLost(event) {
+  function disposeGpu() {
+    for (const entry of [trace, temporal, resolve]) {
+      if (entry) {
+        entry.shaders.forEach((s) => gl.deleteShader(s));
+        gl.deleteProgram(entry.program);
+      }
+    }
+    gl.deleteBuffer(buffer);
+    gl.deleteFramebuffer(fbo);
+    gl.deleteTexture(texture);
+    historyTextures.forEach((t) => gl.deleteTexture(t));
+    historyFbos.forEach((f) => gl.deleteFramebuffer(f));
+  }
+  const lostHandler = (event) => {
     event.preventDefault();
     lost = true;
+    ready = false;
     cancelAnimationFrame(frame);
     frame = 0;
-    previous = 0;
     onError?.(
-      new Error("The graphics context was interrupted. Restoring the gallery…"),
+      new Error("The graphics context was interrupted. Restoring the room…"),
       true,
     );
-  }
-  function restored() {
+  };
+  const restored = () => {
     lost = false;
     try {
       initialize();
       invalidate();
     } catch (error) {
+      failed = true;
       onError?.(error, false);
     }
-  }
+  };
   initialize();
   const observer = new ResizeObserver(resize);
   observer.observe(canvas);
-  document.addEventListener("visibilitychange", visibility);
-  canvas.addEventListener("webglcontextlost", contextLost);
-  canvas.addEventListener("webglcontextrestored", restored);
-  invalidate();
+  listen(document, "visibilitychange", onVisibility);
+  listen(canvas, "webglcontextlost", lostHandler);
+  listen(canvas, "webglcontextrestored", restored);
   return {
     state,
-    select(study) {
-      if (study !== state.study) {
-        state.study = study;
-        prepare(study);
+    move(x, z) {
+      const l = Math.max(1, Math.hypot(x, z));
+      movement = [x / l, z / l];
+      invalidate();
+    },
+    look(x, y) {
+      state.yaw += x;
+      state.pitch = clamp(state.pitch + y, -1.25, 1.25);
+      historyValid = false;
+      convergence = 0;
+      invalidate();
+    },
+    setGathering,
+    interact(mode = "push") {
+      updateCamera(0);
+      updateTarget();
+      if (target.kind === "glyph") {
+        onEvent?.({ type: "glyph" });
+        invalidate();
+        return target;
       }
-      resetCamera();
-      ripple = 0;
-      lastInteraction = performance.now();
-      invalidate();
-    },
-    setQuality(mode) {
-      if (!["high", "ultra", "adaptive"].includes(mode)) return;
-      state.quality = mode;
-      scale =
-        mode === "ultra"
-          ? Math.min(window.devicePixelRatio || 1, 2) * 1.35
-          : mode === "high"
-            ? 1
-            : 0.85;
-      pixelLimit = mode === "ultra" ? 6500000 : 2400000;
-      resize();
-    },
-    setHover(value) {
-      hoverTarget = value;
-      invalidate();
-    },
-    press() {
-      press = 1;
-      invalidate();
-    },
-    setFlow(value) {
-      state.flow = value;
-      invalidate();
-    },
-    setDispersion(value) {
-      state.dispersion = value;
-      invalidate();
+      if (target.kind !== "drop") {
+        onEvent?.({ type: "miss" });
+        return null;
+      }
+      const hit = simulation.interact(
+        state.position,
+        forward,
+        mode === "gather" ? "attract" : mode,
+      );
+      if (hit) {
+        pressedId = target.id;
+        pressTime = clock;
+        onEvent?.({
+          type: mode === "split" ? "split-interaction" : "pulse",
+          dropId: target.id,
+        });
+        invalidate();
+      }
+      return hit;
     },
     setPaused(value) {
-      state.paused = value;
+      state.paused = Boolean(value);
       previous = 0;
       frames = 0;
-      sampleTime = 0;
+      sampleStarted = 0;
       invalidate();
     },
-    orbit(x, y) {
-      state.yaw = Math.max(-1.15, Math.min(1.15, state.yaw + x));
-      state.pitch = Math.min(0.55, state.pitch + y);
-      floorLimit();
-      lastInteraction = performance.now();
+    setQuality(value) {
+      if (!["high", "ultra"].includes(value)) return;
+      state.quality = value;
+      resize();
+    },
+    setEffect(id, duration = 16000) {
+      if (!["resonance", "constellation", "afterimage"].includes(id)) return;
+      effectId = id;
+      effectStarted = clock;
+      effectUntil = clock + duration / 1000;
+      onEvent?.({ type: "effect", id });
       invalidate();
     },
-    zoom(delta) {
-      state.distance = Math.max(
-        state.study === 1 ? 0.85 : 4.8,
-        Math.min(9.5, state.distance + delta),
-      );
-      floorLimit();
-      lastInteraction = performance.now();
+    reset() {
+      state.position = [0, 1.65, 4.5];
+      state.yaw = 0;
+      state.pitch = -0.045;
+      movement = [0, 0];
+      setGathering(false);
       invalidate();
     },
-    pulse() {
-      ripple = 1;
-      press = 1;
-      invalidate();
-    },
-    reset: resetCamera,
     dispose() {
       destroyed = true;
       cancelAnimationFrame(frame);
       observer.disconnect();
-      document.removeEventListener("visibilitychange", visibility);
-      canvas.removeEventListener("webglcontextlost", contextLost);
-      canvas.removeEventListener("webglcontextrestored", restored);
-      gl.deleteBuffer(buffer);
-      programs.forEach((entry) => {
-        entry.shaders.forEach((shader) => gl.deleteShader(shader));
-        gl.deleteProgram(entry.program);
-      });
-      programs.clear();
-      resolveShaders.forEach((shader) => gl.deleteShader(shader));
-      gl.deleteProgram(resolveProgram);
-      gl.deleteTexture(texture);
-      gl.deleteFramebuffer(framebuffer);
+      listeners.forEach((fn) => fn());
+      disposeGpu();
     },
   };
 }

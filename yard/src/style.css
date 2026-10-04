@@ -453,3 +453,43 @@ button.discovery-status:hover { color: #21485f; background: #ffffff56; }
   .study-orbit-navigation .study-arrow { top: 49%; width: 60px; height: 75px; }
   .look-around-hint { bottom: 114px; }
 }
+
+/* On compact screens, only the two sliders fold away; actions stay anchored. */
+@media (max-width: 900px), (max-height: 500px) and (orientation: landscape) {
+  .controls,
+  .controls-toggle[aria-expanded="true"] ~ .controls {
+    gap: 8px;
+    padding: 8px;
+  }
+  .control-actions,
+  .controls-toggle[aria-expanded="true"] ~ .controls .control-actions {
+    display: grid;
+    grid-template-columns: 1fr 1.65fr;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 0;
+    border: 0;
+  }
+  .control-actions .pulse-button {
+    min-width: 0;
+    min-height: 44px;
+    padding: 7px;
+    font-size: 10px;
+  }
+  .control-actions .pulse-symbol { display: none; }
+  .control-actions .secondary-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+    min-width: 0;
+  }
+  .control-actions .secondary-actions > span { display: none; }
+  .control-actions .secondary-actions .text-button {
+    justify-content: center;
+    min-height: 44px;
+    margin: 0;
+    padding: 7px 2px;
+    font-size: 10px;
+  }
+}

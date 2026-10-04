@@ -106,3 +106,23 @@ test("ring geometry rejects impossible dimensions", () => {
     RangeError,
   );
 });
+
+
+test("the ring bows toward an outside camera without moving its main stop", () => {
+  const viewportHeight = 900;
+  const cardHeight = viewportHeight * 0.37;
+  const ring = createViewportRingGeometry({ viewportHeight, cardHeight, count: 3 });
+  const theta = 0.4;
+  const radius = viewportHeight * 0.82;
+  const perspective = radius * 4;
+  const centerZ = radius * (1 - Math.cos(theta));
+  assert.equal(ring.radius, radius);
+  assert.equal(ring.perspective, perspective);
+  assert.ok(centerZ > 0, "neighbours bend toward the camera");
+  assert.ok(perspective > radius * 2, "the camera is outside the ring");
+  assert.deepEqual(ring.projectEdges(0), [-cardHeight / 2, cardHeight / 2]);
+  const expected = [-cardHeight / 2, cardHeight / 2].map(edge =>
+    perspective * (radius * Math.sin(theta) + edge * Math.cos(theta)) /
+      (perspective - centerZ + edge * Math.sin(theta)));
+  ring.projectEdges(theta).forEach((edge, i) => assert.ok(Math.abs(edge - expected[i]) < tolerance));
+});

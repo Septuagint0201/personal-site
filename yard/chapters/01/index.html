@@ -44,17 +44,17 @@
 
         <div class="specimen-note" aria-hidden="true"><span>REAL-TIME LIGHT STUDIES</span><span>EST. 2026</span></div>
 
-        <button id="controls-toggle" class="controls-toggle" type="button" aria-label="Expand light controls" aria-controls="controls" aria-expanded="false">
+        <button id="controls-toggle" class="controls-toggle" type="button" aria-label="Show light and dispersion sliders" aria-controls="light-control dispersion-control" aria-expanded="false">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M4 17h16" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" /><circle cx="9" cy="7" r="2.5" fill="#151d2a" stroke="currentColor" stroke-width="1.3"/><circle cx="15" cy="17" r="2.5" fill="#151d2a" stroke="currentColor" stroke-width="1.3"/></svg>
         </button>
 
         <section id="controls" class="controls" aria-label="Sculpture controls">
           <p class="control-summary">MOONLIGHT <span>Drag the glass to turn its facets.</span></p>
-          <div class="control-field">
+          <div id="light-control" class="control-field">
             <div class="range-heading"><label class="control-label" for="light">Light intensity</label><output id="light-value" for="light">65%</output></div>
             <input id="light" type="range" min="0" max="100" value="65" aria-label="Light intensity" />
           </div>
-          <div class="control-field">
+          <div id="dispersion-control" class="control-field">
             <div class="range-heading"><label class="control-label" for="dispersion">Dispersion</label><output id="dispersion-value" for="dispersion">55%</output></div>
             <input id="dispersion" type="range" min="0" max="100" value="55" aria-label="Glass dispersion" />
           </div>
