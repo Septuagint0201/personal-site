@@ -393,6 +393,9 @@ button.discovery-status:hover { background: #bbdcf209; color: #d1e6f6; }
 .intro .eyebrow > span { background: #7898a8; }
 .intro h1 { color: #243e4f; text-shadow: 0 2px 24px rgba(240, 246, 241, .2); }
 .intro h1 em { color: #53768a; }
+@media (min-width: 901px) {
+  .intro h1 { font-size: clamp(54px, min(6.4vw, 10vh), 96px); white-space: nowrap; }
+}
 .intro-copy { color: #536b7b; }
 .interaction-hint { color: #546e7e; }
 .interaction-hint i { color: #8198a4; }

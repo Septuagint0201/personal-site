@@ -176,6 +176,9 @@ input:focus-visible {
   font-weight: 400;
   color: #4f6c74;
 }
+@media (min-width: 901px) {
+  .gallery-intro h1 { white-space: nowrap; }
+}
 .gallery-description {
   font-size: 12px;
   line-height: 1.95;
