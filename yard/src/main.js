@@ -10,9 +10,9 @@ const motion = matchMedia('(prefers-reduced-motion: reduce)');
 const unlocked = new Set();
 const captions = { prism: '01 — PRISM STUDY', halo: '02 — LIQUID KNOT', orbit: '03 — QUIET ORBITS' };
 const studies = {
-  prism: { index: '01', title: 'Prism study', form: 'Icosahedron', character: 'Faceted / crystalline', description: 'Twenty faces, one borrowed sky. Each edge divides the room into a different reflection. Drag the crystal itself to bring a new facet into the moonlight.', prompt: 'Turn down the light, then slowly rotate a facet. Watch the edges hold onto the last glimmer. Release the glass and its momentum carries on.' },
-  halo: { index: '02', title: 'Liquid knot', form: 'Torus knot', character: 'Continuous / fluid', description: 'A single ribbon returns to itself, slipping over and under its own reflection. Its narrow curves gather light like the lip of a glass.', prompt: 'Drag the knot until its opening becomes a perfect little window. Raise dispersion and follow the split colors around the loop.' },
-  orbit: { index: '03', title: 'Quiet orbits', form: 'Sphere + glass ring', character: 'Spherical / weightless', description: 'A lens with a world inside it. The central sphere folds the room into a small, curved image while its companion ring catches a different horizon.', prompt: 'Rotate the glass ring across the sphere. Compare their overlapping refractions, then hold the glass until its small companions drift apart.' },
+  prism: { index: '01', title: 'Prism study', form: 'Icosahedron', character: 'Faceted / crystalline', description: 'Twenty faces, one borrowed sky. Each edge divides the room into a different reflection. Drag to move around the crystal and discover a new facet in the moonlight.', prompt: 'Turn down the light, then slowly move around a facet. Watch the edges hold onto the last glimmer as your viewpoint changes.' },
+  halo: { index: '02', title: 'Liquid knot', form: 'Torus knot', character: 'Continuous / fluid', description: 'A single ribbon returns to itself, slipping over and under its own reflection. Its narrow curves gather light like the lip of a glass.', prompt: 'Move around the knot until its opening becomes a perfect little window. Raise dispersion and follow the split colors around the loop.' },
+  orbit: { index: '03', title: 'Quiet orbits', form: 'Sphere + glass ring', character: 'Spherical / weightless', description: 'A lens with a world inside it. The central sphere folds the room into a small, curved image while its companion ring catches a different horizon.', prompt: 'Move around the glass ring and sphere. Compare their overlapping refractions, then hold the glass until its small companions drift apart.' },
 };
 let playground, toastTimer = 0, keyboardHold = 0, pathsVisible = false;
 
@@ -97,7 +97,7 @@ function syncPause() {
 }
 function togglePause() {
   if (motion.matches && playground?.isPaused()) {
-    toast('Reduced motion is on. You can still look around, rotate the glass, and explore each study.');
+    toast('Reduced motion is on. You can still move around the glass, look around, and explore each study.');
     return;
   }
   playground?.setPaused(!playground.isPaused());

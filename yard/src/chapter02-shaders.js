@@ -10,15 +10,21 @@ out vec4 outColor;
 uniform vec2 resolution,jitter;
 uniform vec3 cameraPosition,cameraForward,cameraRight,cameraUp;
 uniform vec4 rodsA[32],rodsB[32];
-uniform int rodCount,dropCount,lightCount,bounceLimit;
+uniform int rodCount,dropCount,lightCount,bounceLimit,edgeSamples;
 uniform vec4 drops[16],shapes[16],axes[16],velocities[16];
 uniform vec4 lightPositions[8],lightNormals[8],lightTangents[8],lightColors[8];
 uniform float clock,effectAge;
 uniform int effect,selectedDrop;
 uniform bool hdr;
 const float INF=1000.;
-const float EPS=.003;
+const float EPS=.0002;
 struct Hit {float t;vec3 p;vec3 n;int kind;int id;};
+// A direction-only offset collapses at glancing angles and can re-hit the same
+// surface. Offset to the outgoing side of the geometric normal instead.
+vec3 rayOrigin(Hit h,vec3 direction){
+ float bias=h.kind==3 && shapes[h.id].w>0.?.0018:.00045;
+ return h.p+h.n*(dot(direction,h.n)>=0.?bias:-bias)+direction*EPS;
+}
 float sphereCap(vec3 ro,vec3 rd,vec3 center,float radius){
  vec3 oc=ro-center;float b=dot(rd,oc);vec3 closest=oc-rd*b;float h=radius*radius-dot(closest,closest);
  if(h<0.)return INF;
@@ -64,11 +70,11 @@ float pairHit(vec3 ro,vec3 rd,int i,int j,float maximum){
  float r=length(drops[i].xyz-drops[j].xyz)*.5+max(length(dropRadii(i)),length(dropRadii(j)));
  vec3 o=ro-center;float b=dot(o,rd),c=dot(o,o)-r*r,h=b*b-c;if(h<0.)return INF;
  float near=max(EPS,-b-sqrt(h)),far=min(maximum,-b+sqrt(h));if(far<near)return INF;
- float t=near+.002;
+ float t=near+EPS;
  for(int step=0;step<52;step++){
   float d=pairDistance(ro+rd*t,i,j);
-  if(abs(d)<.0012 && t>EPS*1.5)return t;
-  t+=max(abs(d)*.72,.001);
+  if(abs(d)<.00045 && t>EPS)return t;
+  t+=max(abs(d)*.72,.0003);
   if(t>far)break;
  }
  return INF;
@@ -119,6 +125,41 @@ vec3 wallLight(Hit h){
  }
  return vec3(0.);
 }
+float intervalCoverage(float center,float halfSize,float halfFootprint){
+ float width=max(halfFootprint,.00001);
+ return max(0.,min(center+width,halfSize)-max(center-width,-halfSize))/(2.*width);
+}
+vec3 filteredWallLight(Hit h,vec3 dx,vec3 dy){
+ vec3 emission=vec3(0.);
+ for(int i=0;i<8;i++){
+  if(i>=lightCount)break;
+  vec3 q=h.p-lightPositions[i].xyz,normal=lightNormals[i].xyz;
+  if(abs(dot(q,normal))>=.035)continue;
+  vec3 tangent=lightTangents[i].xyz,bitangent=cross(normal,tangent);
+  vec2 footprint=.5*vec2(abs(dot(dx,tangent))+abs(dot(dy,tangent)),abs(dot(dx,bitangent))+abs(dot(dy,bitangent)));
+  float coverage=intervalCoverage(dot(q,tangent),lightNormals[i].w*.5,footprint.x)*intervalCoverage(dot(q,bitangent),lightTangents[i].w*.5,footprint.y);
+  emission+=lightColor(i)*coverage;
+ }
+ return emission;
+}
+vec3 metalNormalDifferential(Hit h,vec3 dp){
+ vec3 segment=rodsB[h.id].xyz-rodsA[h.id].xyz,axis=normalize(segment);
+ float along=dot(h.p-rodsA[h.id].xyz,axis);
+ if(along>0. && along<length(segment))dp-=axis*dot(dp,axis);
+ return (dp-h.n*dot(h.n,dp))/rodsA[h.id].w;
+}
+void metalRayDifferential(Hit h,vec3 rd,vec3 rayDelta,out vec3 originDelta,out vec3 directionDelta){
+ float facing=dot(rd,h.n);
+ float denominator=(facing<0.?-1.:1.)*max(abs(facing),.08);
+ originDelta=h.t*(rayDelta-rd*dot(rayDelta,h.n)/denominator);
+ vec3 normalDelta=metalNormalDifferential(h,originDelta);
+ directionDelta=reflect(rayDelta,h.n)-2.*(dot(rd,normalDelta)*h.n+facing*normalDelta);
+}
+vec3 wallDifferential(Hit h,vec3 rd,vec3 originDelta,vec3 directionDelta){
+ vec3 delta=originDelta+h.t*directionDelta;
+ float facing=dot(rd,h.n);
+ return delta-rd*dot(delta,h.n)/((facing<0.?-1.:1.)*max(abs(facing),.04));
+}
 vec3 diffuseRoom(Hit h){
  vec3 albedo=h.id==1?vec3(.085,.11,.13):vec3(.043,.067,.084);
  if(h.p.y<.02){
@@ -149,92 +190,157 @@ vec3 diffuseRoom(Hit h){
  return c;
 }
 vec3 fastReflection(vec3 ro,vec3 rd){
- Hit h=intersectScene(ro,rd);
- if(h.kind==4)return vec3(.26,1.15,2.1);
- if(h.kind==1){vec3 emission=wallLight(h);return max(emission,diffuseRoom(h));}
- if(h.kind==2){
-  rd=reflect(rd,h.n);h=intersectScene(h.p+rd*.006,rd);
-  if(h.kind==1)return max(wallLight(h),diffuseRoom(h));
+ vec3 weight=vec3(1.);
+ // Follow both glass interfaces. Jumping an estimated diameter misses the exit
+ // normal, so tiny entry changes used to create unrelated bright colour dots.
+ for(int bounce=0;bounce<3;bounce++){
+  Hit h=intersectScene(ro,rd);
+  if(h.kind==4)return weight*vec3(.26,1.15,2.1);
+  if(h.kind==1)return weight*max(wallLight(h),diffuseRoom(h));
+  if(h.kind==2){rd=reflect(rd,h.n);weight*=vec3(.93,.965,.985);}
+  else if(h.kind==3){
+   bool leaving=dot(rd,h.n)>0.;vec3 normal=leaving?-h.n:h.n;
+   vec3 transmitted=refract(rd,normal,leaving?1.48:1./1.48);
+   if(dot(transmitted,transmitted)<.0001)rd=reflect(rd,normal);
+   else{rd=normalize(transmitted);weight*=.96;}
+  }
+  else break;
+  ro=rayOrigin(h,rd);
  }
- if(h.kind==3){
-  vec3 d=refract(rd,dot(rd,h.n)>0.?-h.n:h.n,1./1.48);
-  // The reflected branch has a short transport budget; the main path below
-  // continues through all glass boundaries and mirror bars.
-  vec3 p=h.p+normalize(d)*max(.05,drops[h.id].w*2.1);
-  Hit back=intersectScene(p,normalize(d));
-  if(back.kind==1)return max(wallLight(back),diffuseRoom(back))*.9;
- }
- return vec3(.035,.057,.080);
+ return weight*vec3(.035,.057,.080);
 }
-vec3 transport(vec3 ro,vec3 rd,Hit first,float wavelength){
+vec3 transport(vec3 ro,vec3 rd,Hit first,float wavelength,out bool touchedGlass){
  vec3 total=vec3(0.),weight=vec3(1.);Hit hit=first;bool inGlass=false;
+ touchedGlass=false;
+ vec3 originDx=vec3(0.),originDy=vec3(0.),directionDx=vec3(0.),directionDy=vec3(0.);
+ if(first.kind==2){
+  // Project one pixel through the curved mirror onto its reflected light.
+  // This integrates unresolved strip coverage instead of blurring the image.
+  float angular=2.*dot(rd,cameraForward)/(1.62*resolution.y);
+  metalRayDifferential(first,rd,(cameraRight-rd*dot(rd,cameraRight))*angular,originDx,directionDx);
+  metalRayDifferential(first,rd,(cameraUp-rd*dot(rd,cameraUp))*angular,originDy,directionDy);
+ }
  float ior=1.47+wavelength*.013;
  for(int bounce=0;bounce<9;bounce++){
   if(bounce>=bounceLimit)break;
   if(inGlass)weight*=exp(-vec3(.09,.026,.017)*min(hit.t,3.));
   if(hit.kind==4){total+=weight*vec3(.26,1.15,2.1);break;}
   if(hit.kind==1){
-   vec3 emission=wallLight(hit);
+   vec3 emission;
+   if(first.kind==2 && bounce==1)emission=filteredWallLight(hit,wallDifferential(hit,rd,originDx,directionDx),wallDifferential(hit,rd,originDy,directionDy));
+   else emission=wallLight(hit);
    if(max(emission.r,max(emission.g,emission.b))>.02){total+=weight*emission;break;}
    total+=weight*diffuseRoom(hit);
    if(hit.p.y<.02 && bounce<2){
-    total+=weight*.12*fastReflection(hit.p+hit.n*.007,reflect(rd,hit.n));
+    vec3 reflected=reflect(rd,hit.n);
+    total+=weight*.12*fastReflection(rayOrigin(hit,reflected),reflected);
    }
    break;
   }
   if(hit.kind==2){weight*=vec3(.93,.965,.985);rd=reflect(rd,hit.n);}
   else if(hit.kind==3){
+   touchedGlass=true;
    bool leaving=dot(rd,hit.n)>0.;vec3 normal=leaving?-hit.n:hit.n;
    float f0=pow((ior-1.)/(ior+1.),2.);
    float fresnel=f0+(1.-f0)*pow(1.-clamp(dot(-rd,normal),0.,1.),5.);
    vec3 transmitted=refract(rd,normal,leaving?ior:1./ior);
    if(dot(transmitted,transmitted)<.001){rd=reflect(rd,normal);}
    else{
-    total+=weight*fresnel*fastReflection(hit.p+normal*.005,reflect(rd,normal));
+    vec3 reflected=reflect(rd,normal);
+    total+=weight*fresnel*fastReflection(rayOrigin(hit,reflected),reflected);
     weight*=1.-fresnel;rd=normalize(transmitted);inGlass=!leaving;
    }
    if(selectedDrop>=0 && (hit.id==selectedDrop || int(shapes[hit.id].w)-1==selectedDrop))total+=weight*vec3(.015,.08,.12)*pow(1.-abs(dot(rd,normal)),2.);
    if(effect==2)total+=weight*vec3(.008,.024,.034);
   }
   else break;
-  ro=hit.p+rd*.007;hit=intersectScene(ro,rd);
+  ro=rayOrigin(hit,rd);hit=intersectScene(ro,rd);
  }
  return total;
 }
 vec3 aces(vec3 x){return clamp((x*(2.51*x+.03))/(x*(2.43*x+.59)+.14),0.,1.);}
-void main(){
- vec2 p=((gl_FragCoord.xy+jitter)*2.-resolution)/resolution.y;
- vec3 rd=normalize(cameraForward*1.62+cameraRight*p.x+cameraUp*p.y);
- Hit first=intersectScene(cameraPosition,rd);vec3 color;
+vec3 shadeSample(vec3 rd,Hit first){
+ vec3 color;
  if(first.kind==1){color=max(wallLight(first),diffuseRoom(first));}
  else{
-  color=vec3(0.);
+  bool touchedGlass=true;color=vec3(0.);
+  // Metal-only paths are achromatic. Only trace the remaining wavelengths when
+  // the primary path actually encounters glass; reflections stay full RGB.
   for(int channel=0;channel<3;channel++){
-   vec3 spectral=transport(cameraPosition,rd,first,float(channel-1));color[channel]=spectral[channel];
+   if(channel>0 && !touchedGlass)break;
+   bool encountered;
+   float wavelength=channel==0?0.:channel==1?-1.:1.;
+   vec3 spectral=transport(cameraPosition,rd,first,wavelength,encountered);
+   if(channel==0){color=spectral;touchedGlass=encountered;}
+   else if(channel==1)color.r=spectral.r;
+   else color.b=spectral.b;
   }
  }
  if(effect==3){float g=dot(color,vec3(.2126,.7152,.0722));color=mix(color,vec3(g*.68,g*.9,g*1.25),.65);}
- outColor=vec4(hdr?color:pow(aces(color*.85),vec3(1./2.2)),float(first.kind)*.2);
+ return color;
+}
+vec3 cameraRay(vec2 offset){
+ vec2 p=((gl_FragCoord.xy+offset)*2.-resolution)/resolution.y;
+ return normalize(cameraForward*1.62+cameraRight*p.x+cameraUp*p.y);
+}
+void main(){
+ vec3 rd=cameraRay(jitter);Hit first=intersectScene(cameraPosition,rd);
+ vec3 color=shadeSample(rd,first);float material=float(first.kind)*.2;
+ // Detect edges in display-referred radiance, including equal-luminance RGB
+ // dispersion. Derivatives run before divergent sampling. Smooth interiors and
+ // walls retain one ray; all wavelengths share each added subpixel location.
+ vec3 visible=aces(color*.9);
+ vec3 change=fwidth(visible);
+ float contrast=max(change.r,max(change.g,change.b));
+ float silhouette=fwidth(material);
+ float curvature=length(fwidth(first.n));
+ bool edge=contrast>.055 || silhouette>.01 || (first.kind>1 && curvature>.13);
+ if(edge){
+  for(int sampleIndex=1;sampleIndex<4;sampleIndex++){
+   if(sampleIndex>=edgeSamples)break;
+   vec2 shift=edgeSamples==2?vec2(.5):sampleIndex==1?vec2(.5,0.):sampleIndex==2?vec2(0.,.5):vec2(.5);
+   vec3 ray=cameraRay(fract(jitter+.5+shift)-.5);
+   Hit h=intersectScene(cameraPosition,ray);
+   color+=shadeSample(ray,h);material+=float(h.kind)*.2;
+  }
+  color/=float(edgeSamples);material/=float(edgeSamples);
+ }
+ outColor=vec4(hdr?color:pow(aces(color*.85),vec3(1./2.2)),material);
 }`;
 export const temporalSource = `#version 300 es
 precision highp float;
 uniform sampler2D image,previousImage;
 uniform vec2 resolution;
-uniform float historyWeight;
+uniform float historyWeight,sceneMotion;
 out vec4 outColor;
+vec3 toYCoCg(vec3 c){return vec3(dot(c,vec3(.25,.5,.25)),c.r*.5-c.b*.5,c.g*.5-(c.r+c.b)*.25);}
+vec3 fromYCoCg(vec3 c){return vec3(c.x+c.y-c.z,c.x+c.z,c.x-c.y-c.z);}
 void main(){
  vec2 uv=gl_FragCoord.xy/resolution,px=1./resolution;
  vec4 current=texture(image,uv),previous=texture(previousImage,uv);
- vec3 lo=current.rgb,hi=current.rgb;
- for(int i=0;i<4;i++){
-  vec2 offset=i==0?vec2(1.,0.):i==1?vec2(-1.,0.):i==2?vec2(0.,1.):vec2(0.,-1.);
-  vec3 c=texture(image,uv+offset*px).rgb;lo=min(lo,c);hi=max(hi,c);
+ vec3 lo=toYCoCg(current.rgb),hi=lo,mean=vec3(0.),moment=vec3(0.);
+ float loMaterial=current.a,hiMaterial=current.a;
+ for(int y=-1;y<=1;y++){
+  for(int x=-1;x<=1;x++){
+   vec4 neighbour=texture(image,uv+vec2(float(x),float(y))*px);
+   vec3 c=toYCoCg(neighbour.rgb);
+   lo=min(lo,c);hi=max(hi,c);mean+=c;moment+=c*c;
+   loMaterial=min(loMaterial,neighbour.a);hiMaterial=max(hiMaterial,neighbour.a);
+  }
  }
- float weight=historyWeight*step(abs(current.a-previous.a),.05);
- // Moving glass uses a short history. Mirror metal integrates the subpixel
- // strip-light highlights; neighbourhood clamping prevents long light ghosts.
- if(current.a>.5)weight*=.25;
- vec3 old=clamp(previous.rgb,lo,hi);
+ mean/=9.;vec3 sigma=sqrt(max(vec3(0.),moment/9.-mean*mean));
+ // Preserve jittered silhouette coverage when either material remains in the
+ // footprint. Exact material equality discarded the very samples AA needs.
+ float mismatch=max(loMaterial-previous.a,previous.a-hiMaterial);
+ float weight=historyWeight*(1.-smoothstep(.025,.13,mismatch));
+ // Static glass can converge fully; moving glass gets a short history because
+ // this renderer has no motion-vector reprojection.
+ weight*=mix(1.,.58,sceneMotion*smoothstep(.40,.56,hiMaterial));
+ // Clip chroma separately from luminance. Independent RGB bounds can retain
+ // unrelated saturated histories at refractive highlights.
+ vec3 lower=max(lo,mean-sigma*vec3(2.5,1.5,1.5));
+ vec3 upper=min(hi,mean+sigma*vec3(2.5,1.5,1.5));
+ vec3 old=max(vec3(0.),fromYCoCg(clamp(toYCoCg(previous.rgb),lower,upper)));
  outColor=vec4(mix(current.rgb,old,weight),current.a);
 }`;
 export const resolveSource = `#version 300 es

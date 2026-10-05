@@ -416,6 +416,11 @@ button.discovery-status:hover { color: #21485f; background: #ffffff56; }
 .specimen-note { right: 20px; top: 25%; font-size: 7px; opacity: .7; }
 .control-summary { margin: 0; color: #3d6175; font-size: 8px; line-height: 1.8; letter-spacing: .2em; }
 .control-summary span { display: block; margin-top: 6px; color: #667d89; font-size: 10px; line-height: 1.6; letter-spacing: .015em; }
+.experience .touch-hint { display: none; }
+@media (pointer: coarse) {
+  .experience .mouse-hint { display: none; }
+  .experience .touch-hint { display: block; }
+}
 .controls { grid-template-columns: 1.2fr 1fr 1fr 1.32fr; }
 .look-around-hint { position: absolute; bottom: 208px; left: 50%; width: max-content; max-width: calc(100% - 120px); margin: 0; transform: translateX(-50%); color: #456272; font-size: 10px; text-align: center; line-height: 1.8; opacity: 0; transition: opacity .5s; }
 .look-around-hint span { display: block; color: #617c8a; font-size: 9px; }
@@ -447,7 +452,7 @@ button.discovery-status:hover { color: #21485f; background: #ffffff56; }
 }
 @media (max-height: 500px) and (orientation: landscape) {
   .control-summary { padding: 3px 9px; font-size: 7px; }
-  .control-summary span { display: none; }
+  .experience .control-summary span { display: none; }
   .control-field, .control-actions { display: none; }
   .controls { grid-template-columns: 1fr; }
   .study-orbit-navigation .study-arrow { top: 49%; width: 60px; height: 75px; }

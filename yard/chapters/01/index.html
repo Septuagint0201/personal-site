@@ -10,7 +10,7 @@
   </head>
   <body>
     <main class="experience" aria-label="Yard optical playground">
-      <div id="stage" tabindex="0" aria-label="Interactive glass collection. Drag the room to look around; drag the focused glass to turn it. Scroll or press Left and Right to switch studies. A and D turn the view."></div>
+      <div id="stage" tabindex="0" aria-label="Interactive glass collection. Left-drag to orbit the focused glass. Right-drag to look around in place. On touch, drag the glass to orbit or the empty room to look around. Scroll or press Left and Right to switch studies. A and D turn the view."></div>
       <div class="vignette" aria-hidden="true"></div>
 
       <div class="interface">
@@ -33,14 +33,14 @@
           <p class="eyebrow"><span aria-hidden="true"></span> Chapter 01 · An optical playground</p>
           <h1 id="headline">Light,<br />in a different<br /><em>state.</em></h1>
           <p class="intro-copy">A small universe of glass.<br /> Yours to disturb.</p>
-          <p class="interaction-hint"><span>Drag the room to look around</span><i aria-hidden="true">·</i><span>Scroll to switch</span></p>
+          <p class="interaction-hint"><span>Drag the glass to orbit</span><i aria-hidden="true">·</i><span class="mouse-hint">Scroll to switch</span><span class="touch-hint">Tap a triangle to switch</span></p>
         </section>
 
         <nav class="study-orbit-navigation" aria-label="Move around the glass collection">
           <button type="button" class="glass-arrow study-arrow" data-direction="left" aria-label="Previous glass study" title="Previous study · Left arrow"><canvas class="arrow-glass" aria-hidden="true"></canvas></button>
           <button type="button" class="glass-arrow study-arrow" data-direction="right" aria-label="Next glass study" title="Next study · Right arrow"><canvas class="arrow-glass" aria-hidden="true"></canvas></button>
         </nav>
-        <p class="look-around-hint">Three works, one orbit. <span>Drag the empty room to discover what is behind you.</span></p>
+        <p class="look-around-hint">Three works, one orbit. <span class="mouse-hint">Right-drag to look around. Left-drag to return to the glass.</span><span class="touch-hint">Drag the room to look around. Drag the glass to orbit it.</span></p>
 
         <div class="specimen-note" aria-hidden="true"><span>REAL-TIME LIGHT STUDIES</span><span>EST. 2026</span></div>
 
@@ -49,7 +49,7 @@
         </button>
 
         <section id="controls" class="controls" aria-label="Sculpture controls">
-          <p class="control-summary">MOONLIGHT <span>Drag the glass to turn its facets.</span></p>
+          <p class="control-summary">MOONLIGHT <span class="mouse-hint">Drag to orbit · Right-drag to look</span><span class="touch-hint">Drag glass to orbit · Room to look</span></p>
           <div id="light-control" class="control-field">
             <div class="range-heading"><label class="control-label" for="light">Light intensity</label><output id="light-value" for="light">65%</output></div>
             <input id="light" type="range" min="0" max="100" value="65" aria-label="Light intensity" />
@@ -104,7 +104,7 @@
         <section id="panel-studies" class="notes-panel" role="tabpanel" aria-labelledby="tab-studies" tabindex="0">
           <p class="notes-caption" id="study-index">STUDY 01 / 03</p>
           <h3 id="study-name">Prism study</h3>
-          <p class="notes-copy" id="study-description">Twenty faces, one borrowed sky. Each edge divides the room into a different reflection. Drag the crystal itself to bring a new facet into the moonlight.</p>
+          <p class="notes-copy" id="study-description">Twenty faces, one borrowed sky. Each edge divides the room into a different reflection. Drag to move around the crystal and discover a new facet in the moonlight.</p>
           <dl class="material-stats"><div><dt>Form</dt><dd id="study-form">Icosahedron</dd></div><div><dt>Refraction</dt><dd>1.50 IOR</dd></div><div><dt>Character</dt><dd id="study-character">Faceted / crystalline</dd></div></dl>
           <p class="observation"><span>TRY THIS</span><span id="study-prompt">Turn down the light, then move the cursor slowly across a facet. Watch the edges hold onto the last glimmer.</span></p>
           <button id="paths-toggle" class="paths-toggle" type="button" aria-pressed="false"><span aria-hidden="true">⤳</span><span>Show light paths</span></button>
@@ -122,9 +122,9 @@
         <section id="panel-guide" class="notes-panel" role="tabpanel" aria-labelledby="tab-guide" tabindex="0" hidden>
         <p class="help-lead">Nothing here is quite still. Make yourself part of the experiment.</p>
         <dl class="gesture-guide">
-          <div><dt>Look around</dt><dd>Drag the empty room to turn your head. Two waiting sculptures stand behind you, on the same circular track.</dd></div>
-          <div><dt>Change study</dt><dd>Scroll, press Left or Right, or touch a glass triangle. Touch a waiting sculpture to move one place in its screen direction.</dd></div>
-          <div><dt>Turn the glass</dt><dd>Drag the focused sculpture to rotate its facets. Release it to keep a little momentum. Reset view brings the arch back.</dd></div>
+          <div><dt>Orbit the glass</dt><dd>Left-drag anywhere, or drag the glass with one finger, to move around the focused sculpture. The view stays aimed at the glass.</dd></div>
+          <div><dt>Look around</dt><dd>Right-drag, or swipe the empty room on touch, to turn your head without moving. A and D look left and right; Up and Down look vertically. Left-drag returns your focus to the glass.</dd></div>
+          <div><dt>Change study</dt><dd>Scroll, press Left or Right, or touch a glass triangle. Touch a waiting sculpture to move one place toward it around the collection. The circular order stays the same as you look around. Reset view brings the arch back.</dd></div>
           <div><dt>Make a ripple</dt><dd>Touch the glass or send a pulse through the scene.</dd></div>
           <div><dt>Shape the light</dt><dd>Stay in moonlight. Adjust intensity and dispersion, or open the drawn light paths to study the glass.</dd></div>
         </dl>

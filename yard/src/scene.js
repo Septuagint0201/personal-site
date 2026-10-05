@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { createRingNavigator } from './ring-navigation.js';
 import { createGlassArrows } from './glass-arrows.js';
+import { createGlassCamera, glassClickDirection, glassDragAngles } from './glass-camera.js';
 
 const palettes = {
   prism: { glass: 0xf6fcff, light: 0x83e8f5, rim: 0xb692fa },
@@ -25,11 +26,11 @@ export function createPlayground(stage, { onHit, onHold, onSceneChange, onFrame,
   const glassArrows = createGlassArrows({ source: () => renderer.domElement, buttons: arrowButtons, reducedMotion: motion.matches, onInvalidate: () => invalidate(250) });
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(39, 1, 0.1, 80);
-  camera.position.set(0, 0.65, 8.4);
-  // The viewer stays inside the collection's orbit. Looking around turns the
-  // camera in place; it never sends the two waiting sculptures off their track.
-  let viewYaw = 0, viewPitch = -0.077, targetYaw = 0, targetPitch = -0.077;
+  const cameraRig = createGlassCamera();
+  const camera = new THREE.PerspectiveCamera(cameraRig.fov, 1, 0.1, 80);
+  camera.position.fromArray(cameraRig.pose.position);
+  // The home eye sits near the arch side of the collection. The camera can
+  // orbit a sculpture or turn in place independently of the collection track.
   const cameraTarget = new THREE.Vector3();
   const trackRadius = 12, trackCenterZ = 12;
   const exhibitNames = Object.keys(palettes);
@@ -192,7 +193,7 @@ export function createPlayground(stage, { onHit, onHold, onSceneChange, onFrame,
     mesh.userData.exhibit = name;
     group.add(mesh);
     assembly.add(group);
-    exhibits[name] = { group, mesh, hover: 0, clicked: 0, turnX: 0, turnY: 0, velocityX: 0, velocityY: 0 };
+    exhibits[name] = { group, mesh, hover: 0, clicked: 0 };
     return group;
   }
   // Inset each broad face before taking its hull: the edge bevels are real
@@ -362,8 +363,7 @@ export function createPlayground(stage, { onHit, onHold, onSceneChange, onFrame,
       mode = exhibitNames[index];
       stage.dataset.scene = mode;
       stage.dataset.selectedIndex = String(index);
-      targetYaw = Math.round(viewYaw / (Math.PI * 2)) * Math.PI * 2;
-      targetPitch = -Math.atan2(0.65, camera.position.z);
+      cameraRig.home();
       updatePalette();
       onSceneChange?.(mode);
       invalidate(2500);
@@ -389,11 +389,11 @@ export function createPlayground(stage, { onHit, onHold, onSceneChange, onFrame,
     const ratio = Math.min(devicePixelRatio || 1, mobile ? 1.45 : 1.7, Math.sqrt(1800000 / (width * height))) * qualityScale;
     renderer.setPixelRatio(ratio);
     renderer.setSize(width, height);
-    camera.fov = mobile ? 45 : 39;
+    cameraRig.resize(mobile);
+    camera.fov = cameraRig.fov;
     camera.aspect = width / height;
     camera.setViewOffset(width, height, mobile ? 0 : -width * 0.14, mobile ? -height * 0.08 : 0, width, height);
     camera.updateProjectionMatrix();
-    camera.position.set(0, 0.65, mobile ? 10.5 : 8.4);
     invalidate();
   }
   function updatePalette() {
@@ -478,13 +478,8 @@ export function createPlayground(stage, { onHit, onHold, onSceneChange, onFrame,
     invalidate();
   }
   function reset() {
-    camera.position.set(0, 0.65, stage.clientWidth < 900 && stage.clientHeight > stage.clientWidth ? 10.5 : 8.4);
-    targetYaw = Math.round(viewYaw / (Math.PI * 2)) * Math.PI * 2;
-    targetPitch = -Math.atan2(0.65, camera.position.z);
+    cameraRig.home();
     navigation.setPreview(0);
-    for (const exhibit of Object.values(exhibits)) {
-      exhibit.turnX = exhibit.turnY = exhibit.velocityX = exhibit.velocityY = 0;
-    }
     offset.set(0, 0, 0);
     impulse.set(0, 0, 0);
     gravityUntil = resonanceUntil = constellationUntil = 0;
@@ -499,20 +494,23 @@ export function createPlayground(stage, { onHit, onHold, onSceneChange, onFrame,
   }
   let press = null, holdTimer = 0;
   function cancelHold() { clearTimeout(holdTimer); holdTimer = 0; }
+  listen(renderer.domElement, 'contextmenu', event => event.preventDefault());
   listen(renderer.domElement, 'pointerdown', event => {
-    if (event.button !== 0) return;
+    if (event.button !== 0 && event.button !== 2) return;
     if (!event.isPrimary) { cancelHold(); press = null; return; }
     const hit = pick(event);
-    press = { x: event.clientX, y: event.clientY, lastX: event.clientX, lastY: event.clientY, hit: hit?.object, held: false, moved: false };
+    const gesture = event.button === 2 || (event.pointerType === 'touch' && !hit) ? 'look' : 'orbit';
+    press = { pointerId: event.pointerId, button: event.button, gesture, x: event.clientX, y: event.clientY, lastX: event.clientX, lastY: event.clientY, hit: hit?.object, held: false, moved: false };
     renderer.domElement.setPointerCapture(event.pointerId);
     renderer.domElement.style.cursor = 'grabbing';
     navigation.setPreview(0);
-    if (hit && (!hit.object.userData.exhibit || hit.object.userData.exhibit === mode)) holdTimer = setTimeout(() => {
+    if (event.button === 0 && hit && (!hit.object.userData.exhibit || hit.object.userData.exhibit === mode)) holdTimer = setTimeout(() => {
       if (press) { press.held = true; onHold?.(); }
     }, 1300);
     invalidate(1500);
   });
   listen(renderer.domElement, 'pointermove', event => {
+    if (press && event.pointerId !== press.pointerId) return;
     if (press && Math.hypot(event.clientX - press.x, event.clientY - press.y) > 8) { press.moved = true; cancelHold(); }
     const bounds = renderer.domElement.getBoundingClientRect();
     pointerNdcX = (event.clientX - bounds.left) / bounds.width * 2 - 1;
@@ -521,16 +519,12 @@ export function createPlayground(stage, { onHit, onHold, onSceneChange, onFrame,
     hovered = hit?.object ?? null;
     if (press?.moved) {
       const dx = event.clientX - press.lastX, dy = event.clientY - press.lastY;
-      if (press.hit?.userData.exhibit === mode) {
-        const exhibit = exhibits[mode];
-        exhibit.turnY += dx * 0.009;
-        exhibit.turnX += dy * 0.009;
-        exhibit.velocityY = dx * 0.06;
-        exhibit.velocityX = dy * 0.06;
-        stage.dataset.manipulation = 'sculpture';
+      const [horizontal, vertical] = glassDragAngles(dx, dy, bounds.width, bounds.height, camera.fov);
+      if (press.gesture === 'orbit') {
+        cameraRig.orbit(horizontal, vertical, exhibits[mode].group.position.toArray());
+        stage.dataset.manipulation = 'orbit';
       } else {
-        targetYaw -= dx * 0.0055;
-        targetPitch = THREE.MathUtils.clamp(targetPitch + dy * 0.004, -0.65, 0.55);
+        cameraRig.look(horizontal, vertical);
         stage.dataset.manipulation = 'look';
       }
     } else if (!press && event.pointerType !== 'touch') {
@@ -542,14 +536,14 @@ export function createPlayground(stage, { onHit, onHold, onSceneChange, onFrame,
     invalidate();
   }, { passive: true });
   listen(renderer.domElement, 'pointerup', event => {
+    if (press && event.pointerId !== press.pointerId) return;
     cancelHold();
-    if (press?.hit && !press.held && !press.moved && Math.hypot(event.clientX - press.x, event.clientY - press.y) < 8 && pick(event)) {
+    if (press?.button === 0 && press.hit && !press.held && !press.moved && Math.hypot(event.clientX - press.x, event.clientY - press.y) < 8 && pick(event)?.object === press.hit) {
       const name = press.hit.userData.exhibit;
       if (name && name !== mode) {
         // A visible sculpture is a directional affordance, not an index jump.
-        // This still advances only one neighbour when more works join the ring.
-        const projected = exhibits[name].group.getWorldPosition(new THREE.Vector3()).project(camera);
-        step(projected.x < 0 ? -1 : 1);
+        // Its circular identity survives looking around and crossing index zero.
+        step(glassClickDirection(navigation.index, exhibitNames.indexOf(name), exhibitNames.length));
       } else { pulse(); onHit?.(); }
       if (name) exhibits[name].clicked = 1;
       else press.hit.userData.clicked = 1;
@@ -615,14 +609,6 @@ export function createPlayground(stage, { onHit, onHold, onSceneChange, onFrame,
     if (moving || (interactive && !motion.matches)) time += delta;
     if (moving) motionTime += delta;
     const trackMoving = navigation.update(delta);
-    const ease = motion.matches ? 1 : 1 - Math.exp(-delta * 8);
-    viewYaw += (targetYaw - viewYaw) * ease;
-    viewPitch += (targetPitch - viewPitch) * ease;
-    cameraTarget.set(Math.sin(viewYaw) * Math.cos(viewPitch), Math.sin(viewPitch), -Math.cos(viewYaw) * Math.cos(viewPitch)).add(camera.position);
-    camera.lookAt(cameraTarget);
-    const lookingAround = Math.cos(viewYaw) < 0.75;
-    stage.parentElement.classList.toggle('is-looking-around', lookingAround);
-    stage.dataset.view = lookingAround ? 'around' : 'arch';
     cursorLight.position.lerp(lightTarget, motion.matches ? 1 : 0.12);
     const gravity = time < gravityUntil ? 1 : 0;
     const resonating = time < resonanceUntil;
@@ -640,16 +626,10 @@ export function createPlayground(stage, { onHit, onHold, onSceneChange, onFrame,
         if (name === mode) exhibit.group.position.add(offset);
         exhibit.stand.position.set(x, -1.8, z);
         const isHovered = hovered?.userData.exhibit === name;
-        const isPressed = press?.hit?.userData.exhibit === name;
+        const isPressed = press?.button === 0 && press.hit?.userData.exhibit === name;
         exhibit.hover += ((isHovered ? 1 : 0) - exhibit.hover) * (motion.matches ? 1 : Math.min(1, delta * 12));
         exhibit.clicked = motion.matches ? 0 : exhibit.clicked * Math.exp(-delta * 8);
-        if (!press && !motion.matches && (moving || interactive)) {
-          exhibit.turnX += exhibit.velocityX * delta;
-          exhibit.turnY += exhibit.velocityY * delta;
-          exhibit.velocityX *= Math.exp(-delta * 3.5);
-          exhibit.velocityY *= Math.exp(-delta * 3.5);
-        }
-        exhibit.group.rotation.set(exhibit.turnX, exhibit.turnY + motionTime * 0.09, Math.sin(motionTime * 0.27) * 0.065);
+        exhibit.group.rotation.set(0, motionTime * 0.09, Math.sin(motionTime * 0.27) * 0.065);
         exhibit.group.scale.setScalar(1 + exhibit.hover * 0.032 - exhibit.clicked * 0.065 - (isPressed ? 0.04 : 0));
         exhibit.group.traverse(object => {
           if (!object.isMesh) return;
@@ -664,7 +644,7 @@ export function createPlayground(stage, { onHit, onHold, onSceneChange, onFrame,
         mesh.rotation.set(motionTime * 0.11 + i, motionTime * 0.19, i * 0.3);
         mesh.userData.hover = THREE.MathUtils.lerp(mesh.userData.hover || 0, hovered === mesh ? 1 : 0, motion.matches ? 1 : Math.min(1, delta * 12));
         mesh.userData.clicked = motion.matches ? 0 : (mesh.userData.clicked || 0) * Math.exp(-delta * 8);
-        mesh.scale.setScalar(1 + mesh.userData.hover * 0.09 - mesh.userData.clicked * 0.1 - (press?.hit === mesh ? 0.075 : 0));
+        mesh.scale.setScalar(1 + mesh.userData.hover * 0.09 - mesh.userData.clicked * 0.1 - (press?.button === 0 && press.hit === mesh ? 0.075 : 0));
         mesh.material.emissive.setHex(0xa9e9ff);
         mesh.material.emissiveIntensity = mesh.userData.hover * 0.09;
       });
@@ -691,6 +671,20 @@ export function createPlayground(stage, { onHit, onHold, onSceneChange, onFrame,
         sparkMaterial.opacity = Math.max(0, 1 - sparkAge / 2.5);
       }
     }
+    const focus = exhibits[mode].group.position.toArray();
+    const view = cameraRig.update(delta, focus, motion.matches);
+    camera.position.fromArray(view.position);
+    cameraTarget.set(Math.sin(view.yaw) * Math.cos(view.pitch), Math.sin(view.pitch), -Math.cos(view.yaw) * Math.cos(view.pitch)).add(camera.position);
+    camera.lookAt(cameraTarget);
+    const lookingAround = Math.cos(view.yaw) < 0.75;
+    stage.parentElement.classList.toggle('is-looking-around', lookingAround);
+    stage.dataset.view = lookingAround ? 'around' : 'arch';
+    stage.dataset.cameraMode = cameraRig.mode;
+    stage.dataset.cameraPosition = view.position.map(value => value.toFixed(4)).join(',');
+    stage.dataset.cameraYaw = view.yaw.toFixed(4);
+    stage.dataset.cameraPitch = view.pitch.toFixed(4);
+    stage.dataset.cameraFov = String(camera.fov);
+    stage.dataset.focusPosition = focus.map(value => value.toFixed(4)).join(',');
     renderer.render(scene, camera);
     glassArrows.render();
     onFrame?.(renderer.domElement);
@@ -704,7 +698,7 @@ export function createPlayground(stage, { onHit, onHold, onSceneChange, onFrame,
       }
     }
     rendering = false;
-    if (moving || trackMoving || now < activityUntil) raf = requestAnimationFrame(render);
+    if (moving || trackMoving || cameraRig.moving || now < activityUntil) raf = requestAnimationFrame(render);
   }
   stage.dataset.scene = 'prism';
   stage.dataset.atmosphere = 'moonlight';
@@ -717,7 +711,7 @@ export function createPlayground(stage, { onHit, onHold, onSceneChange, onFrame,
     setScene, step, setLightPaths, setLight, setDispersion, setPaused, pulse, secret, reset,
     canvas: renderer.domElement,
     isPaused: () => paused,
-    nudge(x, y) { targetYaw += x; targetPitch = THREE.MathUtils.clamp(targetPitch + y, -0.65, 0.55); invalidate(1400); },
+    nudge(x, y) { cameraRig.look(-x, y); invalidate(1400); },
     dispose() {
       disposed = true; cancelAnimationFrame(raf); cancelHold();
       removeListeners.forEach(remove => remove());

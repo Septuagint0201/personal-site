@@ -12,6 +12,14 @@ const subtract = (a, b) => a.map((x, i) => x - b[i]);
 const dot = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
 const addScaled = (a, b, t) => a.map((x, i) => x + b[i] * t);
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+// A centered 16-point Hammersley set covers the whole pixel without the visible
+// four-phase grid. The permutation spreads adjacent frames across the footprint.
+const SUBPIXEL_SAMPLES = Array.from({ length: 16 }, (_, frame) => {
+  const n = (frame * 7) % 16;
+  const reversed =
+    ((n & 1) << 3) | ((n & 2) << 1) | ((n & 4) >> 1) | ((n & 8) >> 3);
+  return [(n + 0.5) / 16 - 0.5, (reversed + 0.5) / 16 - 0.5];
+});
 function raySphere(origin, direction, center, radius) {
   const o = subtract(origin, center),
     b = dot(o, direction),
@@ -156,8 +164,12 @@ export function createLiquidRenderer(
       return false;
     if (!gl.getProgramParameter(entry.program, gl.LINK_STATUS))
       throw new Error(
-        gl.getProgramInfoLog(entry.program) ||
-          entry.shaders.map((s) => gl.getShaderInfoLog(s)).join("\n"),
+        [
+          gl.getProgramInfoLog(entry.program),
+          ...entry.shaders.map((s) => gl.getShaderInfoLog(s)),
+        ]
+          .filter(Boolean)
+          .join("\n"),
       );
     entry.shaders.forEach((s) => gl.deleteShader(s));
     entry.shaders = [];
@@ -249,6 +261,7 @@ export function createLiquidRenderer(
         "dropCount",
         "lightCount",
         "bounceLimit",
+        "edgeSamples",
         "drops[0]",
         "shapes[0]",
         "axes[0]",
@@ -271,6 +284,7 @@ export function createLiquidRenderer(
         "previousImage",
         "resolution",
         "historyWeight",
+        "sceneMotion",
       ])
     )
       return false;
@@ -516,14 +530,10 @@ export function createLiquidRenderer(
     gl.uniform3fv(u.cameraForward, forward);
     gl.uniform3fv(u.cameraRight, right);
     gl.uniform3fv(u.cameraUp, up);
-    const jitter = [
-      [-0.25, -0.25],
-      [0.25, -0.25],
-      [-0.25, 0.25],
-      [0.25, 0.25],
-    ][sampleIndex++ % 4];
+    const jitter = SUBPIXEL_SAMPLES[sampleIndex++ % SUBPIXEL_SAMPLES.length];
     gl.uniform2f(u.jitter, jitter[0], jitter[1]);
     gl.uniform1i(u.bounceLimit, state.quality === "ultra" ? 8 : 5);
+    gl.uniform1i(u.edgeSamples, state.quality === "ultra" ? 4 : 2);
     gl.uniform1f(u.clock, sceneClock);
     gl.uniform1i(
       u.effect,
@@ -542,7 +552,20 @@ export function createLiquidRenderer(
     gl.bindTexture(gl.TEXTURE_2D, historyTextures[historyIndex]);
     gl.uniform1i(temporal.uniforms.previousImage, 1);
     gl.uniform2f(temporal.uniforms.resolution, targetWidth, targetHeight);
-    gl.uniform1f(temporal.uniforms.historyWeight, historyValid ? 0.78 : 0);
+    gl.uniform1f(
+      temporal.uniforms.historyWeight,
+      historyValid ? Math.min(0.9, convergence / (convergence + 1)) : 0,
+    );
+    gl.uniform1f(
+      temporal.uniforms.sceneMotion,
+      !state.paused ||
+        gathering ||
+        effectId ||
+        Math.abs(hoverValue - (selectedId !== null ? 1 : 0)) > 0.005 ||
+        clock - pressTime < 0.6
+        ? 1
+        : 0,
+    );
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     historyIndex = nextHistory;
     historyValid = true;
@@ -592,7 +615,7 @@ export function createLiquidRenderer(
       movement[1] ||
       gathering ||
       effectId ||
-      convergence < 12 ||
+      convergence < 32 ||
       Math.abs(hoverValue - (selectedId !== null ? 1 : 0)) > 0.005 ||
       clock - pressTime < 0.6
     )
@@ -707,6 +730,7 @@ export function createLiquidRenderer(
     },
     setPaused(value) {
       state.paused = Boolean(value);
+      convergence = 0;
       previous = 0;
       frames = 0;
       sampleStarted = 0;
@@ -730,6 +754,8 @@ export function createLiquidRenderer(
       state.yaw = 0;
       state.pitch = -0.045;
       movement = [0, 0];
+      historyValid = false;
+      convergence = 0;
       setGathering(false);
       invalidate();
     },
