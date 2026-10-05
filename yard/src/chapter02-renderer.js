@@ -10,6 +10,7 @@ import { createLiquidSimulation, MAX_DROPS } from "./liquid-simulation.js";
 import { AREA_LIGHTS, METAL_SEGMENTS } from "./liquid-room.js";
 import { moveWalkingCamera } from "./liquid-camera.js";
 import { findLiquidTarget } from "./liquid-targeting.js";
+import { writeEllipsoidTransform } from "./liquid-optics.js";
 
 const subtract = (a, b) => a.map((x, i) => x - b[i]);
 const dot = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
@@ -134,7 +135,9 @@ export function createLiquidRenderer(
     up = [0, 1, 0];
   const positions = new Float32Array(MAX_DROPS * 4),
     shapes = new Float32Array(MAX_DROPS * 4),
-    axes = new Float32Array(MAX_DROPS * 4),
+    dropX = new Float32Array(MAX_DROPS * 4),
+    dropY = new Float32Array(MAX_DROPS * 4),
+    dropZ = new Float32Array(MAX_DROPS * 4),
     velocities = new Float32Array(MAX_DROPS * 4);
   const simulation = createLiquidSimulation({
     onEvent: (event) => {
@@ -289,7 +292,7 @@ export function createLiquidRenderer(
         "edgeSamples",
         "drops[0]",
         "shapes[0]",
-        "axes[0]",
+        "dropX[0]", "dropY[0]", "dropZ[0]",
         "velocities[0]",
         "lightPositions[0]",
         "lightNormals[0]",
@@ -323,7 +326,7 @@ export function createLiquidRenderer(
           rodB = new Float32Array(32 * 4);
         METAL_SEGMENTS.forEach((s, i) => {
           rodA.set([...s.a, s.radius], i * 4);
-          rodB.set([...s.b, 0], i * 4);
+          rodB.set([...s.b, 1 / Math.hypot(...subtract(s.b, s.a))], i * 4);
         });
         gl.uniform4fv(u["rodsA[0]"], rodA);
         gl.uniform4fv(u["rodsB[0]"], rodB);
@@ -471,7 +474,8 @@ export function createLiquidRenderer(
     }
     onTarget?.(target);
   }
-  function uploadDrops(entry) {
+  let packedDropCount = 0, packedSelected = -1;
+  function packDrops() {
     const list = simulation.getDrops();
     const ids = new Map(list.map((d, i) => [d.id, i]));
     let selected = -1;
@@ -491,17 +495,26 @@ export function createLiquidRenderer(
         ],
         i * 4,
       );
-      axes.set([...d.orientation, d.deform[1] / d.deform[0]], i * 4);
+      writeEllipsoidTransform(dropX, dropY, dropZ, i * 4, d, 1 + shapes[i * 4 + 2] * .025);
+      // The enclosing sphere only rejects impossible hits; keep a small guard
+      // around Float32 rounding at grazing silhouettes.
+      shapes[i * 4] = Math.max(dropX[i * 4 + 3], dropY[i * 4 + 3], dropZ[i * 4 + 3]) + .0001;
       velocities.set([...d.velocity, 0], i * 4);
       if (d.id === selectedId) selected = i;
     });
+    packedDropCount = list.length;
+    packedSelected = selected;
+  }
+  function uploadDrops(entry) {
     const u = entry.uniforms;
     gl.uniform4fv(u["drops[0]"], positions);
     gl.uniform4fv(u["shapes[0]"], shapes);
-    gl.uniform4fv(u["axes[0]"], axes);
+    gl.uniform4fv(u["dropX[0]"], dropX);
+    gl.uniform4fv(u["dropY[0]"], dropY);
+    gl.uniform4fv(u["dropZ[0]"], dropZ);
     gl.uniform4fv(u["velocities[0]"], velocities);
-    gl.uniform1i(u.dropCount, list.length);
-    gl.uniform1i(u.selectedDrop, selected);
+    gl.uniform1i(u.dropCount, packedDropCount);
+    gl.uniform1i(u.selectedDrop, packedSelected);
   }
   function uploadScene(entry, jitter) {
     const u = entry.uniforms;
@@ -577,6 +590,7 @@ export function createLiquidRenderer(
       historyValid = false;
       convergence = 0;
     }
+    packDrops();
     const jitter = SUBPIXEL_SAMPLES[sampleIndex++ % SUBPIXEL_SAMPLES.length];
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
     gl.viewport(0, 0, targetWidth, targetHeight);

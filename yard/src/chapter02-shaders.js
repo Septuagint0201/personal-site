@@ -11,7 +11,7 @@ uniform vec2 resolution,jitter;
 uniform vec3 cameraPosition,cameraForward,cameraRight,cameraUp;
 uniform vec4 rodsA[32],rodsB[32];
 uniform int rodCount,dropCount,lightCount,bounceLimit,edgeSamples;
-uniform vec4 drops[16],shapes[16],axes[16],velocities[16];
+uniform vec4 drops[16],shapes[16],dropX[16],dropY[16],dropZ[16],velocities[16];
 uniform vec4 lightPositions[8],lightNormals[8],lightTangents[8],lightColors[8];
 uniform float clock,effectAge;
 uniform vec3 interactionPoint;
@@ -34,37 +34,34 @@ float sphereCap(vec3 ro,vec3 rd,vec3 center,float radius){
  if(h<0.)return INF;
  float t=-b-sqrt(h);if(t>EPS)return t;t=-b+sqrt(h);return t>EPS?t:INF;
 }
-float capsule(vec3 ro,vec3 rd,vec3 a,vec3 b,float r){
- vec3 ba=b-a,oa=ro-a;float lengthBA=length(ba);vec3 axis=ba/lengthBA;
+float capsule(vec3 ro,vec3 rd,vec3 a,vec3 b,float r,float inverseLength){
+ vec3 ba=b-a,oa=ro-a;float lengthBA=1./inverseLength;vec3 axis=ba*inverseLength;
  float originAxis=dot(oa,axis),rayAxis=dot(rd,axis);
  vec3 perpendicularOrigin=oa-axis*originAxis,perpendicularRay=rd-axis*rayAxis;
  float aa=dot(perpendicularRay,perpendicularRay),bb=dot(perpendicularOrigin,perpendicularRay);
- float nearest=min(sphereCap(ro,rd,a,r),sphereCap(ro,rd,b,r));
  if(aa>.000001){
   float middle=-bb/aa;vec3 closest=perpendicularOrigin+perpendicularRay*middle;
   float h=r*r-dot(closest,closest);
-  if(h>=0.){float t=middle-sqrt(h/aa),y=originAxis+t*rayAxis;
-   if(t>EPS && y>0. && y<lengthBA)nearest=min(nearest,t);}
+  // Both end caps lie inside the infinite cylinder. A cylinder miss cannot
+  // touch them; an entry on its finite side is already the nearest surface.
+  if(h<0.)return INF;
+  float t=middle-sqrt(h/aa),y=originAxis+t*rayAxis;
+  if(t>EPS && y>0. && y<lengthBA)return t;
  }
- return nearest;
+ return min(sphereCap(ro,rd,a,r),sphereCap(ro,rd,b,r));
 }
 vec3 capsuleNormal(vec3 p,vec3 a,vec3 b){vec3 ba=b-a;return normalize(p-a-ba*clamp(dot(p-a,ba)/dot(ba,ba),0.,1.));}
-mat3 dropBasis(int i){
- vec3 z=normalize(axes[i].xyz);
- vec3 x=normalize(cross(abs(z.y)<.92?vec3(0.,1.,0.):vec3(1.,0.,0.),z));
- return mat3(x,cross(z,x),z);
-}
-vec3 dropRadii(int i){return max(vec3(.006),drops[i].w*vec3(shapes[i].x,shapes[i].x*axes[i].w,shapes[i].y)*(1.+shapes[i].z*.025));}
+vec3 dropRadii(int i){return vec3(dropX[i].w,dropY[i].w,dropZ[i].w);}
+vec3 dropLocal(vec3 v,int i){return vec3(dot(v,dropX[i].xyz),dot(v,dropY[i].xyz),dot(v,dropZ[i].xyz));}
 float ellipsoidHit(vec3 ro,vec3 rd,int i){
- mat3 basis=dropBasis(i);vec3 r=dropRadii(i);
- vec3 o=transpose(basis)*(ro-drops[i].xyz)/r,d=transpose(basis)*rd/r;
+ vec3 o=dropLocal(ro-drops[i].xyz,i),d=dropLocal(rd,i);
  float a=dot(d,d),b=dot(o,d),middle=-b/a;vec3 closest=o+d*middle;float h=1.-dot(closest,closest);
  if(h<0.)return INF;
  float t=middle-sqrt(h/a);if(t>EPS)return t;
  t=middle+sqrt(h/a);return t>EPS?t:INF;
 }
-vec3 dropNormal(vec3 p,int i){mat3 b=dropBasis(i);vec3 r=dropRadii(i);return normalize(b*(transpose(b)*(p-drops[i].xyz)/(r*r)));}
-float dropDistance(vec3 p,int i){vec3 q=transpose(dropBasis(i))*(p-drops[i].xyz),r=dropRadii(i);float k0=length(q/r),k1=length(q/(r*r));return k0*(k0-1.)/max(k1,.0001);}
+vec3 dropNormal(vec3 p,int i){vec3 q=dropLocal(p-drops[i].xyz,i);return normalize(dropX[i].xyz*q.x+dropY[i].xyz*q.y+dropZ[i].xyz*q.z);}
+float dropDistance(vec3 p,int i){vec3 q=dropLocal(p-drops[i].xyz,i);float k0=length(q),k1=length(q/dropRadii(i));return k0*(k0-1.)/max(k1,.0001);}
 float pairDistance(vec3 p,int i,int j){
  float a=dropDistance(p,i),b=dropDistance(p,j),k=min(drops[i].w,drops[j].w)*.52;
  float h=clamp(.5+.5*(b-a)/max(k,.001),0.,1.);return mix(b,a,h)-k*h*(1.-h);
@@ -94,25 +91,34 @@ Hit intersectScene(vec3 ro,vec3 rd){
  }
  for(int i=0;i<32;i++){
   if(i>=rodCount)break;
-  float t=capsule(ro,rd,rodsA[i].xyz,rodsB[i].xyz,rodsA[i].w);
-  if(t<hit.t){hit.t=t;hit.kind=2;hit.id=i;hit.n=capsuleNormal(ro+rd*t,rodsA[i].xyz,rodsB[i].xyz);}
+  float t=capsule(ro,rd,rodsA[i].xyz,rodsB[i].xyz,rodsA[i].w,rodsB[i].w);
+  if(t<hit.t){hit.t=t;hit.kind=2;hit.id=i;}
  }
  for(int i=0;i<16;i++){
   if(i>=dropCount)break;
   int pair=int(shapes[i].w)-1;if(pair>=0 && pair<i)continue;
+  if(pair<0){
+   vec3 offset=ro-drops[i].xyz;float along=dot(offset,rd),radius=shapes[i].x;
+   if(along>radius || -along-radius>hit.t)continue;
+   vec3 nearest=offset-rd*along;
+   if(dot(nearest,nearest)>radius*radius)continue;
+  }
   float t=pair>=0?pairHit(ro,rd,i,pair,hit.t):ellipsoidHit(ro,rd,i);
-  if(t<hit.t){hit.t=t;hit.kind=3;hit.id=i;hit.n=pair>=0?pairNormal(ro+rd*t,i,pair):dropNormal(ro+rd*t,i);}
+  if(t<hit.t){hit.t=t;hit.kind=3;hit.id=i;}
  }
  if(effect==2 || effect==3){
   for(int i=0;i<16;i++){
    if(i>=dropCount)break;
    vec3 end=effect==2?drops[(i+1)%dropCount].xyz:drops[i].xyz-velocities[i].xyz*2.8;
    if(length(end-drops[i].xyz)<.025)continue;
-   float t=capsule(ro,rd,drops[i].xyz,end,effect==2?.006:.012);
+   float t=capsule(ro,rd,drops[i].xyz,end,effect==2?.006:.012,1./length(end-drops[i].xyz));
    if(t<hit.t){hit.t=t;hit.kind=4;hit.id=i;hit.n=vec3(0.,1.,0.);}
   }
  }
- hit.p=ro+rd*hit.t;return hit;
+ hit.p=ro+rd*hit.t;
+ if(hit.kind==2)hit.n=capsuleNormal(hit.p,rodsA[hit.id].xyz,rodsB[hit.id].xyz);
+ if(hit.kind==3){int pair=int(shapes[hit.id].w)-1;hit.n=pair>=0?pairNormal(hit.p,hit.id,pair):dropNormal(hit.p,hit.id);}
+ return hit;
 }
 vec3 lightColor(int i){
  vec3 c=lightColors[i].rgb;
