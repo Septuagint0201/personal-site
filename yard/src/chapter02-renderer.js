@@ -1,7 +1,9 @@
 import {
   vertexSource,
   traceSource,
+  roomSource,
   temporalSource,
+  bloomSource,
   resolveSource,
 } from "./chapter02-shaders.js";
 import { createLiquidSimulation, MAX_DROPS } from "./liquid-simulation.js";
@@ -93,7 +95,9 @@ export function createLiquidRenderer(
     ready = false,
     compilationStarted = 0;
   let trace,
+    room,
     temporal,
+    bloom,
     resolve,
     buffer,
     texture,
@@ -106,6 +110,8 @@ export function createLiquidRenderer(
     historyValid = false,
     convergence = 0,
     sampleIndex = 0;
+  let bloomTargets = [];
+  let roomTexture, roomFbo;
   let clock = 0,
     sceneClock = 0,
     statusClock = -1,
@@ -189,7 +195,9 @@ export function createLiquidRenderer(
     compilationStarted = performance.now();
     onPreparing?.();
     trace = makeProgram(traceSource);
+    room = makeProgram(roomSource);
     temporal = makeProgram(temporalSource);
+    bloom = makeProgram(bloomSource);
     resolve = makeProgram(resolveSource);
     gl.flush();
     buffer = gl.createBuffer();
@@ -217,7 +225,7 @@ export function createLiquidRenderer(
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     historyTextures = [];
     historyFbos = [];
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < 3; i++) {
       const t = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, t);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -233,11 +241,23 @@ export function createLiquidRenderer(
         t,
         0,
       );
-      historyTextures.push(t);
-      historyFbos.push(f);
+      if (i === 2) { roomTexture = t; roomFbo = f; }
+      else { historyTextures.push(t); historyFbos.push(f); }
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     historyValid = false;
+    bloomTargets = Array.from({ length: 4 }, () => {
+      const texture = gl.createTexture(), framebuffer = gl.createFramebuffer();
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+      return { texture, framebuffer, width: 0, height: 0 };
+    });
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     convergence = 0;
     targetWidth = targetHeight = 0;
     resize();
@@ -245,13 +265,12 @@ export function createLiquidRenderer(
   function prepare() {
     if (
       performance.now() - compilationStarted > 90000 &&
-      (!trace.ready || !temporal.ready || !resolve.ready)
+      (!trace.ready || !room.ready || !temporal.ready || !bloom.ready || !resolve.ready)
     )
       throw new Error(
         "The graphics driver could not finish preparing this room.",
       );
-    if (
-      !configure(trace, [
+    const sceneUniforms = [
         "resolution",
         "jitter",
         "cameraPosition",
@@ -279,9 +298,8 @@ export function createLiquidRenderer(
         "interactionPoint", "interactionAge", "interactionKind", "gatherField",
         "selectedDrop",
         "hdr",
-      ])
-    )
-      return false;
+      ];
+    if (!configure(trace, sceneUniforms) || !configure(room, [...sceneUniforms, "sceneImage"])) return false;
     if (
       !configure(temporal, [
         "image",
@@ -292,35 +310,38 @@ export function createLiquidRenderer(
       ])
     )
       return false;
-    if (!configure(resolve, ["image", "resolution", "hdr"])) return false;
+    if (!configure(bloom, ["image", "resolution", "sourceResolution", "prefilter"])) return false;
+    if (!configure(resolve, ["image", "resolution", "hdr", "bloomNear", "bloomMid", "bloomWide"])) return false;
     if (!ready) {
-      const u = trace.uniforms;
-      gl.useProgram(trace.program);
-      const rodA = new Float32Array(32 * 4),
-        rodB = new Float32Array(32 * 4);
-      METAL_SEGMENTS.forEach((s, i) => {
-        rodA.set([...s.a, s.radius], i * 4);
-        rodB.set([...s.b, 0], i * 4);
-      });
-      gl.uniform4fv(u["rodsA[0]"], rodA);
-      gl.uniform4fv(u["rodsB[0]"], rodB);
-      gl.uniform1i(u.rodCount, METAL_SEGMENTS.length);
-      const lp = new Float32Array(32),
-        ln = new Float32Array(32),
-        lt = new Float32Array(32),
-        lc = new Float32Array(32);
-      AREA_LIGHTS.forEach((l, i) => {
-        lp.set([...l.center, l.intensity], i * 4);
-        ln.set([...l.normal, l.size[0]], i * 4);
-        lt.set([...l.tangent, l.size[1]], i * 4);
-        lc.set([...l.color, 0], i * 4);
-      });
-      gl.uniform4fv(u["lightPositions[0]"], lp);
-      gl.uniform4fv(u["lightNormals[0]"], ln);
-      gl.uniform4fv(u["lightTangents[0]"], lt);
-      gl.uniform4fv(u["lightColors[0]"], lc);
-      gl.uniform1i(u.lightCount, AREA_LIGHTS.length);
-      gl.uniform1i(u.hdr, floatTarget ? 1 : 0);
+      for (const entry of [trace, room]) {
+        const u = entry.uniforms;
+        gl.useProgram(entry.program);
+        const rodA = new Float32Array(32 * 4),
+          rodB = new Float32Array(32 * 4);
+        METAL_SEGMENTS.forEach((s, i) => {
+          rodA.set([...s.a, s.radius], i * 4);
+          rodB.set([...s.b, 0], i * 4);
+        });
+        gl.uniform4fv(u["rodsA[0]"], rodA);
+        gl.uniform4fv(u["rodsB[0]"], rodB);
+        gl.uniform1i(u.rodCount, METAL_SEGMENTS.length);
+        const lp = new Float32Array(32),
+          ln = new Float32Array(32),
+          lt = new Float32Array(32),
+          lc = new Float32Array(32);
+        AREA_LIGHTS.forEach((l, i) => {
+          lp.set([...l.center, l.intensity], i * 4);
+          ln.set([...l.normal, l.size[0]], i * 4);
+          lt.set([...l.tangent, l.size[1]], i * 4);
+          lc.set([...l.color, 0], i * 4);
+        });
+        gl.uniform4fv(u["lightPositions[0]"], lp);
+        gl.uniform4fv(u["lightNormals[0]"], ln);
+        gl.uniform4fv(u["lightTangents[0]"], lt);
+        gl.uniform4fv(u["lightColors[0]"], lc);
+        gl.uniform1i(u.lightCount, AREA_LIGHTS.length);
+        gl.uniform1i(u.hdr, floatTarget ? 1 : 0);
+      }
       ready = true;
       previous = 0;
       sampleStarted = 0;
@@ -351,7 +372,7 @@ export function createLiquidRenderer(
       canvas.width = w;
       canvas.height = h;
       gl.bindTexture(gl.TEXTURE_2D, texture);
-      for (const image of [texture, ...historyTextures]) {
+      for (const image of [texture, roomTexture, ...historyTextures]) {
         gl.bindTexture(gl.TEXTURE_2D, image);
         gl.texImage2D(
           gl.TEXTURE_2D,
@@ -367,6 +388,14 @@ export function createLiquidRenderer(
       }
       historyValid = false;
       convergence = 0;
+      bloomTargets.forEach((target, i) => {
+        target.width = Math.max(1, Math.ceil(w / 2 ** (i + 1)));
+        target.height = Math.max(1, Math.ceil(h / 2 ** (i + 1)));
+        gl.bindTexture(gl.TEXTURE_2D, target.texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, floatTarget ? gl.RGBA16F : gl.RGBA8,
+          target.width, target.height, 0, gl.RGBA,
+          floatTarget ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE, null);
+      });
     }
     invalidate();
   }
@@ -439,7 +468,7 @@ export function createLiquidRenderer(
     }
     onTarget?.(target);
   }
-  function uploadDrops() {
+  function uploadDrops(entry) {
     const list = simulation.getDrops();
     const ids = new Map(list.map((d, i) => [d.id, i]));
     let selected = -1;
@@ -459,17 +488,36 @@ export function createLiquidRenderer(
         ],
         i * 4,
       );
-      axes.set([...d.orientation, 0], i * 4);
+      axes.set([...d.orientation, d.deform[1] / d.deform[0]], i * 4);
       velocities.set([...d.velocity, 0], i * 4);
       if (d.id === selectedId) selected = i;
     });
-    const u = trace.uniforms;
+    const u = entry.uniforms;
     gl.uniform4fv(u["drops[0]"], positions);
     gl.uniform4fv(u["shapes[0]"], shapes);
     gl.uniform4fv(u["axes[0]"], axes);
     gl.uniform4fv(u["velocities[0]"], velocities);
     gl.uniform1i(u.dropCount, list.length);
     gl.uniform1i(u.selectedDrop, selected);
+  }
+  function uploadScene(entry, jitter) {
+    const u = entry.uniforms;
+    gl.uniform2f(u.resolution, targetWidth, targetHeight);
+    gl.uniform3fv(u.cameraPosition, state.position);
+    gl.uniform3fv(u.cameraForward, forward);
+    gl.uniform3fv(u.cameraRight, right);
+    gl.uniform3fv(u.cameraUp, up);
+    gl.uniform2f(u.jitter, jitter[0], jitter[1]);
+    gl.uniform1i(u.bounceLimit, state.quality === "ultra" ? 8 : 5);
+    gl.uniform1i(u.edgeSamples, state.quality === "ultra" ? 4 : 2);
+    gl.uniform1f(u.clock, sceneClock);
+    gl.uniform1i(u.effect, { resonance: 1, constellation: 2, afterimage: 3 }[effectId] || 0);
+    gl.uniform1f(u.effectAge, clock - effectStarted);
+    gl.uniform3fv(u.interactionPoint, interactionPoint);
+    gl.uniform1f(u.interactionAge, motion.matches ? 100 : clock - interactionTime);
+    gl.uniform1i(u.interactionKind, interactionKind);
+    gl.uniform4fv(u.gatherField, [...addScaled(state.position, forward, 1.8), gatherGlow]);
+    uploadDrops(entry);
   }
   function pass(entry) {
     gl.useProgram(entry.program);
@@ -526,36 +574,24 @@ export function createLiquidRenderer(
       historyValid = false;
       convergence = 0;
     }
-    const u = trace.uniforms;
+    const jitter = SUBPIXEL_SAMPLES[sampleIndex++ % SUBPIXEL_SAMPLES.length];
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
     gl.viewport(0, 0, targetWidth, targetHeight);
     pass(trace);
-    gl.uniform2f(u.resolution, targetWidth, targetHeight);
-    gl.uniform3fv(u.cameraPosition, state.position);
-    gl.uniform3fv(u.cameraForward, forward);
-    gl.uniform3fv(u.cameraRight, right);
-    gl.uniform3fv(u.cameraUp, up);
-    const jitter = SUBPIXEL_SAMPLES[sampleIndex++ % SUBPIXEL_SAMPLES.length];
-    gl.uniform2f(u.jitter, jitter[0], jitter[1]);
-    gl.uniform1i(u.bounceLimit, state.quality === "ultra" ? 8 : 5);
-    gl.uniform1i(u.edgeSamples, state.quality === "ultra" ? 4 : 2);
-    gl.uniform1f(u.clock, sceneClock);
-    gl.uniform1i(
-      u.effect,
-      { resonance: 1, constellation: 2, afterimage: 3 }[effectId] || 0,
-    );
-    gl.uniform1f(u.effectAge, clock - effectStarted);
-    gl.uniform3fv(u.interactionPoint, interactionPoint);
-    gl.uniform1f(u.interactionAge, motion.matches ? 100 : clock - interactionTime);
-    gl.uniform1i(u.interactionKind, interactionKind);
-    gl.uniform4fv(u.gatherField, [...addScaled(state.position, forward, 1.8), gatherGlow]);
-    uploadDrops();
+    uploadScene(trace, jitter);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, roomFbo);
+    pass(room);
+    uploadScene(room, jitter);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.uniform1i(room.uniforms.sceneImage, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     const nextHistory = 1 - historyIndex;
     gl.bindFramebuffer(gl.FRAMEBUFFER, historyFbos[nextHistory]);
     pass(temporal);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.bindTexture(gl.TEXTURE_2D, roomTexture);
     gl.uniform1i(temporal.uniforms.image, 0);
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, historyTextures[historyIndex]);
@@ -580,13 +616,34 @@ export function createLiquidRenderer(
     historyIndex = nextHistory;
     historyValid = true;
     convergence++;
+    if (floatTarget) {
+      pass(bloom);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.uniform1i(bloom.uniforms.image, 0);
+      bloomTargets.forEach((target, i) => {
+        const source = i ? bloomTargets[i - 1] : { texture: historyTextures[historyIndex], width: targetWidth, height: targetHeight };
+        gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
+        gl.viewport(0, 0, target.width, target.height);
+        gl.bindTexture(gl.TEXTURE_2D, source.texture);
+        gl.uniform2f(bloom.uniforms.resolution, target.width, target.height);
+        gl.uniform2f(bloom.uniforms.sourceResolution, source.width, source.height);
+        gl.uniform1i(bloom.uniforms.prefilter, i === 0 ? 1 : 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      });
+    }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, targetWidth, targetHeight);
     pass(resolve);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, historyTextures[historyIndex]);
     gl.uniform1i(resolve.uniforms.image, 0);
     gl.uniform1i(resolve.uniforms.hdr, floatTarget ? 1 : 0);
     gl.uniform2f(resolve.uniforms.resolution, targetWidth, targetHeight);
+    ["bloomNear", "bloomMid", "bloomWide"].forEach((name, i) => {
+      gl.activeTexture(gl.TEXTURE2 + i);
+      gl.bindTexture(gl.TEXTURE_2D, bloomTargets[i + 1].texture);
+      gl.uniform1i(resolve.uniforms[name], 2 + i);
+    });
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     frames++;
     if (!sampleStarted) sampleStarted = now;
@@ -657,7 +714,7 @@ export function createLiquidRenderer(
     } else invalidate();
   }
   function disposeGpu() {
-    for (const entry of [trace, temporal, resolve]) {
+    for (const entry of [trace, room, temporal, bloom, resolve]) {
       if (entry) {
         entry.shaders.forEach((s) => gl.deleteShader(s));
         gl.deleteProgram(entry.program);
@@ -666,8 +723,14 @@ export function createLiquidRenderer(
     gl.deleteBuffer(buffer);
     gl.deleteFramebuffer(fbo);
     gl.deleteTexture(texture);
+    gl.deleteTexture(roomTexture);
+    gl.deleteFramebuffer(roomFbo);
     historyTextures.forEach((t) => gl.deleteTexture(t));
     historyFbos.forEach((f) => gl.deleteFramebuffer(f));
+    bloomTargets.forEach(({ texture, framebuffer }) => {
+      gl.deleteTexture(texture);
+      gl.deleteFramebuffer(framebuffer);
+    });
   }
   const lostHandler = (event) => {
     event.preventDefault();

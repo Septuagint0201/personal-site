@@ -240,6 +240,32 @@ test("ray picking selects the nearest visible liquid and respects its ellipsoid 
   close(simulation.pick([0, 2, 3], [0, 0, -1]).distance, 2.4);
 });
 
+test("capillary width oscillation conserves volume and ray picks both unequal transverse axes", () => {
+  const simulation = createLiquidSimulation({ initialDrops: [
+    drop([0, 2, 0], .25, { elongation: 1.4, phase: 1, velocity: [0, 0, -.15] }),
+  ] });
+  advance(simulation, .3);
+  const liquid = simulation.getDrops()[0];
+  assert.ok(Math.abs(liquid.deform[0] - liquid.deform[1]) > .01);
+  close(liquid.deform.reduce((a, b) => a * b, 1), 1);
+  liquid.orientation = [0, 0, 1];
+  for (const axis of [0, 1]) {
+    const origin = [...liquid.position], direction = [0, 0, 0];
+    origin[axis] += 2;
+    direction[axis] = -1;
+    close(simulation.pick(origin, direction).distance, 2 - liquid.radius * liquid.deform[axis]);
+  }
+});
+
+test("near-vertical asymmetric drops use the renderer's transverse basis for picking", () => {
+  const simulation = createLiquidSimulation({ initialDrops: [drop([0, 2, 0], .25)] });
+  const liquid = simulation.getDrops()[0];
+  liquid.orientation = [0, .94, Math.sqrt(1 - .94 ** 2)];
+  liquid.deform = [1.2, .8, 1 / .96];
+  // Above the common .92 pole threshold, local Y is the world X axis.
+  close(simulation.pick([2, 2, 0], [-1, 0, 0]).distance, 2 - .25 * .8);
+});
+
 test("continuous gathering attracts independently drifting drops and announces one three-drop group per hold", () => {
   const events = [];
   const simulation = createLiquidSimulation({

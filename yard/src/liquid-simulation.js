@@ -47,7 +47,7 @@ function randomGenerator(seed) {
  * not a computational-fluid-dynamics solver. All directions are world space.
  *
  * getDrops() exposes live records for allocation-free rendering. deform has
- * determinant one: local X/Y transverse scales and local Z longitudinal scale;
+ * determinant one: two transverse scales and one longitudinal scale;
  * orientation is the local-Z world axis. radius therefore remains the exact
  * equivalent-volume radius. initialDrops is useful for repeatable installations.
  */
@@ -110,11 +110,11 @@ export function createLiquidSimulation({
     };
   }
 
-  function setShape(drop, longitudinal, axis = drop.orientation) {
+  function setShape(drop, longitudinal, axis = drop.orientation, crossSection = 1) {
     const long = clamp(longitudinal, 0.85, 6);
     const transverse = 1 / Math.sqrt(long);
-    drop.deform[0] = transverse;
-    drop.deform[1] = transverse;
+    drop.deform[0] = transverse * crossSection;
+    drop.deform[1] = transverse / crossSection;
     drop.deform[2] = long;
     drop.orientation = norm(axis, drop.orientation);
   }
@@ -475,7 +475,11 @@ export function createLiquidSimulation({
     const axis = drop.orientation.map(
       (v, i) => v * (1 - follow) + motionAxis[i] * follow,
     );
-    setShape(drop, long, axis);
+    // Two capillary modes exchange width without changing volume. Interaction
+    // energy briefly strengthens the motion, then relaxes into a quiet drift.
+    const amplitude = .018 + Math.min(.11, Math.abs(drop.elongation - 1) * .28);
+    const crossSection = Math.exp(Math.sin(elapsed * 3.1 + p) * amplitude);
+    setShape(drop, long, axis, crossSection);
 
     if (drop.age > 1.3) {
       for (
@@ -591,7 +595,7 @@ export function createLiquidSimulation({
     for (const drop of drops) {
       if (drop.radius < 0.012) continue;
       const z = drop.orientation;
-      const x = norm(cross(Math.abs(z[1]) > 0.95 ? [1, 0, 0] : [0, 1, 0], z));
+      const x = norm(cross(Math.abs(z[1]) >= 0.92 ? [1, 0, 0] : [0, 1, 0], z));
       const y = cross(z, x);
       const basis = [x, y, z];
       const offset = subtract(origin, drop.position);

@@ -50,11 +50,11 @@ float capsule(vec3 ro,vec3 rd,vec3 a,vec3 b,float r){
 }
 vec3 capsuleNormal(vec3 p,vec3 a,vec3 b){vec3 ba=b-a;return normalize(p-a-ba*clamp(dot(p-a,ba)/dot(ba,ba),0.,1.));}
 mat3 dropBasis(int i){
- vec3 z=normalize(axes[i].xyz+vec3(0.,0.,.000001));
+ vec3 z=normalize(axes[i].xyz);
  vec3 x=normalize(cross(abs(z.y)<.92?vec3(0.,1.,0.):vec3(1.,0.,0.),z));
  return mat3(x,cross(z,x),z);
 }
-vec3 dropRadii(int i){return max(vec3(.006),drops[i].w*vec3(shapes[i].x,shapes[i].x,shapes[i].y)*(1.+shapes[i].z*.025));}
+vec3 dropRadii(int i){return max(vec3(.006),drops[i].w*vec3(shapes[i].x,shapes[i].x*axes[i].w,shapes[i].y)*(1.+shapes[i].z*.025));}
 float ellipsoidHit(vec3 ro,vec3 rd,int i){
  mat3 basis=dropBasis(i);vec3 r=dropRadii(i);
  vec3 o=transpose(basis)*(ro-drops[i].xyz)/r,d=transpose(basis)*rd/r;
@@ -331,6 +331,61 @@ void main(){
  }
  outColor=vec4(hdr?color:pow(aces(color*.85),vec3(1./2.2)),material);
 }`;
+
+// Room finishing has its own bounded program, avoiding multiplication of surface
+// details through the spectral transport and adaptive sampling call graph.
+export const roomSource = traceSource.slice(0, traceSource.indexOf("vec3 transport(")) + `
+uniform sampler2D sceneImage;
+void main(){
+ vec2 uv=gl_FragCoord.xy/resolution;
+ vec4 original=texture(sceneImage,uv);
+ if(original.a>.205){outColor=original;return;}
+ vec2 screen=((gl_FragCoord.xy+jitter)*2.-resolution)/resolution.y;
+ vec3 rd=normalize(cameraForward*1.62+cameraRight*screen.x+cameraUp*screen.y);
+ Hit first;first.t=INF;first.id=-1;first.kind=1;first.n=vec3(0.);
+ for(int axis=0;axis<3;axis++){
+  if(abs(rd[axis])<.00001)continue;
+  vec3 low=vec3(-5.,0.,-6.),high=vec3(5.,5.,6.);
+  float t=((rd[axis]>0.?high[axis]:low[axis])-cameraPosition[axis])/rd[axis];
+  if(t>EPS && t<first.t){first.t=t;first.id=axis;first.n=vec3(0.);first.n[axis]=rd[axis]>0.?-1.:1.;}
+ }
+ first.p=cameraPosition+rd*first.t;
+ vec3 color=original.rgb;
+ // Room accents operate on HDR radiance; the LDR fallback keeps the traced base.
+ if(!hdr){outColor=original;return;}
+ if(first.p.y<.02){
+  vec3 reflection=reflect(rd,first.n);
+  float fresnel=.065+.22*pow(1.-abs(dot(rd,first.n)),5.);
+  color+=fresnel*fastReflection(rayOrigin(first,reflection),reflection);
+ }
+  // Housings are a surface accent; keep their loop out of recursive lighting.
+  for(int i=0;i<8;i++){
+   if(i>=lightCount)break;
+   vec3 q=first.p-lightPositions[i].xyz;
+   if(abs(dot(q,lightNormals[i].xyz))>.035)continue;
+   vec2 d=abs(vec2(dot(q,lightTangents[i].xyz),dot(q,cross(lightNormals[i].xyz,lightTangents[i].xyz))))-vec2(lightNormals[i].w,lightTangents[i].w)*.5;
+   float border=max(d.x,d.y);
+   if(border>0.){
+    color*=mix(.30,1.,smoothstep(.028,.055,border));
+    color+=vec3(.004,.005,.006)*exp(-pow((border-.043)*200.,2.));
+   }
+  }
+  // Local geometric occlusion anchors the framework at its wall/floor contacts.
+  // It is intentionally evaluated only on the visible room, outside transport.
+  float occlusion=0.;
+  for(int i=0;i<32;i++){
+   if(i>=rodCount)break;
+   vec3 ab=rodsB[i].xyz-rodsA[i].xyz;
+   vec3 closest=rodsA[i].xyz+ab*clamp(dot(first.p-rodsA[i].xyz,ab)/dot(ab,ab),0.,1.);
+   float distanceToRod=max(0.,length(first.p-closest)-rodsA[i].w);
+   occlusion=max(occlusion,exp(-distanceToRod*7.)*.48);
+  }
+  float corner=first.id==1?min(5.-abs(first.p.x),6.-abs(first.p.z)):min(first.p.y,5.-first.p.y);
+  color*=1.-max(occlusion,.26*exp(-max(0.,corner)*3.));
+
+ // Mark the reflective floor separately so moving reflections use short history.
+ outColor=vec4(color,first.p.y<.02?.5:original.a);
+}`;
 export const temporalSource = `#version 300 es
 precision highp float;
 uniform sampler2D image,previousImage;
@@ -367,9 +422,37 @@ void main(){
  vec3 old=max(vec3(0.),fromYCoCg(clamp(toYCoCg(previous.rgb),lower,upper)));
  outColor=vec4(mix(current.rgb,old,weight),current.a);
 }`;
+// A Gaussian downsample chain spreads neighbouring HDR energy continuously.
+// Unlike isolated radial taps, it cannot draw a halo of disconnected bright dots.
+export const bloomSource = `#version 300 es
+precision highp float;
+uniform sampler2D image;
+uniform vec2 resolution,sourceResolution;
+uniform bool prefilter;
+out vec4 outColor;
+vec3 sampleLight(vec2 uv){
+ vec3 c=texture(image,uv).rgb;
+ if(prefilter){
+  float brightness=max(c.r,max(c.g,c.b));
+  float knee=clamp(brightness-.65,0.,1.);
+  float contribution=max(brightness-1.15,knee*knee*.5);
+  c*=max(0.,contribution)/max(brightness,.0001);
+ }
+ return c;
+}
+void main(){
+ vec2 uv=gl_FragCoord.xy/resolution,px=1./sourceResolution;
+ vec3 c=vec3(0.);
+ for(int y=-1;y<=1;y++)for(int x=-1;x<=1;x++){
+  float w=(x==0?2.:1.)*(y==0?2.:1.);
+  c+=sampleLight(uv+vec2(float(x),float(y))*px)*w;
+ }
+ outColor=vec4(c/16.,1.);
+}`;
 export const resolveSource = `#version 300 es
 precision highp float;
 uniform sampler2D image;
+uniform sampler2D bloomNear,bloomMid,bloomWide;
 uniform vec2 resolution;
 uniform bool hdr;
 out vec4 outColor;
@@ -377,22 +460,19 @@ vec3 aces(vec3 x){return clamp((x*(2.51*x+.03))/(x*(2.43*x+.59)+.14),0.,1.);}
 vec3 display(vec3 c){return hdr?pow(aces(max(c,vec3(0.))*.90),vec3(1./2.2)):c;}
 void main(){
  vec2 uv=gl_FragCoord.xy/resolution,px=1./resolution;
- vec3 raw=texture(image,uv).rgb,bloom=vec3(0.);
- for(int i=0;i<8;i++){
-  float a=float(i)*.78539816;vec2 d=vec2(cos(a),sin(a));
-  bloom+=max(vec3(0.),texture(image,uv+d*px*9.).rgb-vec3(1.4))*.016;
-  bloom+=max(vec3(0.),texture(image,uv+d*px*23.).rgb-vec3(1.8))*.009;
- }
- vec3 c=display(raw+bloom);
+ vec3 raw=texture(image,uv).rgb;
+ vec3 bloom=hdr?(texture(bloomNear,uv).rgb*.075+texture(bloomMid,uv).rgb*.065+texture(bloomWide,uv).rgb*.05):vec3(0.);
+ vec3 c=display(raw);
  vec3 a=display(texture(image,uv+vec2(-1.,1.)*px).rgb),b=display(texture(image,uv+px).rgb);
  vec3 d=display(texture(image,uv-px).rgb),e=display(texture(image,uv+vec2(1.,-1.)*px).rgb),luma=vec3(.299,.587,.114);
  float lm=dot(c,luma),la=dot(a,luma),lb=dot(b,luma),ld=dot(d,luma),le=dot(e,luma);
  float lo=min(lm,min(min(la,lb),min(ld,le))),hi=max(lm,max(max(la,lb),max(ld,le)));
  vec2 direction=vec2(-((la+lb)-(ld+le)),(la+ld)-(lb+le));
  direction=clamp(direction/(min(abs(direction.x),abs(direction.y))+max((la+lb+ld+le)*.03125,.0078)),vec2(-7.),vec2(7.))*px;
- vec3 aa=.5*(display(texture(image,uv-direction/6.).rgb)+display(texture(image,uv+direction/6.).rgb));
- vec3 bb=aa*.5+.25*(display(texture(image,uv-direction*.5).rgb)+display(texture(image,uv+direction*.5).rgb));
- float l=dot(bb,luma);vec3 final=hi-lo<.07?c:((l<lo||l>hi)?aa:bb);
+ vec3 aa=.5*(texture(image,uv-direction/6.).rgb+texture(image,uv+direction/6.).rgb);
+ vec3 bb=aa*.5+.25*(texture(image,uv-direction*.5).rgb+texture(image,uv+direction*.5).rgb);
+ float l=dot(display(bb),luma);vec3 filtered=hi-lo<.07?raw:((l<lo||l>hi)?aa:bb);
+ vec3 final=display(filtered+bloom);
  float vignette=1.-.12*pow(length((uv-.5)*vec2(1.,.8)),1.7);
  outColor=vec4(final*vignette,1.);
 }`;
