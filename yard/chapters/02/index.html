@@ -30,7 +30,7 @@
       <canvas
         id="liquid-canvas"
         tabindex="0"
-        aria-label="Walkable liquid-glass chamber. W A S D to walk, drag or arrow keys to look, E to pulse, hold Q to gather, F to split. Aim the centre reticle at a drop."
+        aria-label="Walkable liquid-glass chamber. Click to capture the mouse, move it to look, Escape to release. W A S D to walk, left click or P to pulse, hold E to gather, right click or F to split. On touch, drag to look and use the joystick and action buttons."
         aria-describedby="walk-help"
       ></canvas>
       <div class="gallery-vignette" aria-hidden="true"></div>
@@ -82,18 +82,27 @@
           <span>free droplets</span></span
         >
         <span class="instrument-note">Glass changes shape. Never amount.</span>
+        <span class="cycle-reading" id="cycle-reading">0 joined · 0 returned</span>
       </aside>
+      <div class="capture-prompt" id="capture-prompt">
+        <button id="enter-chamber" type="button"><span class="capture-orbit" aria-hidden="true"></span><span id="capture-label">Enter the current</span><span aria-hidden="true">↗</span></button>
+        <span>Click anywhere in the room to capture the mouse · Esc to release</span>
+      </div>
+      <div class="capture-status" aria-hidden="true"><i></i> WITHIN THE CURRENT <span>Esc / release cursor</span></div>
       <div class="aim-hud" id="aim-hud" aria-hidden="true">
+        <span class="target-distance" id="target-distance"></span>
         <span class="reticle"><i></i><i></i><i></i><i></i></span>
         <span class="target-label" id="target-label">Aim at a drop</span>
         <span class="target-action" id="target-action"></span>
         <span class="gather-progress"><i id="gather-progress"></i></span>
+        <span class="gather-count" id="gather-count">Draw the glass closer</span>
+        <span class="action-echo" id="action-echo"></span>
       </div>
       <p class="sr-only" id="target-announcement" aria-live="polite"></p>
       <div class="walk-help" id="walk-help">
         <span class="desktop-help"
-          ><kbd>W A S D</kbd> walk <span>·</span> Drag to look
-          <span>·</span> Aim, then touch</span
+          ><kbd>W A S D</kbd> walk <span>·</span> Mouse to look
+          <span>·</span> Hold E to gather</span
         ><span class="touch-help"
           >Left thumb to walk · Drag the room to look</span
         >
@@ -141,29 +150,29 @@
           class="matter-action pulse-action"
           id="pulse-action"
           type="button"
-          aria-label="Pulse a drop, E"
+          aria-label="Pulse a drop, left click or P"
         >
           <span class="action-symbol pulse-symbol" aria-hidden="true"></span
-          ><span id="pulse-label">Pulse</span><kbd>E</kbd>
+          ><span id="pulse-label">Pulse</span><kbd>Left click</kbd>
         </button>
         <button
           class="matter-action gather-action"
           id="gather-action"
           type="button"
           aria-pressed="false"
-          aria-label="Hold to gather nearby droplets, Q"
+          aria-label="Hold to gather nearby droplets, E"
         >
           <span class="action-symbol gather-symbol" aria-hidden="true"></span
-          ><span>Gather</span><kbd>hold Q</kbd>
+          ><span>Gather</span><kbd>hold E</kbd>
         </button>
         <button
           class="matter-action split-action"
           id="split-action"
           type="button"
-          aria-label="Split a large drop, F"
+          aria-label="Split a large drop, right click or F"
         >
           <span class="action-symbol split-symbol" aria-hidden="true"></span
-          ><span>Split</span><kbd>F</kbd>
+          ><span>Split</span><kbd>Right click</kbd>
         </button>
       </section>
       <div class="chamber-settings" aria-label="Chamber settings">
@@ -265,19 +274,20 @@
           <div>
             <span>01</span>
             <p>
-              <strong>Step inside</strong><kbd>W A S D</kbd> to walk. Drag the
-              room or use the arrow keys to look. On a touch screen, move with
-              the left joystick and drag with your other thumb. The crosshair
-              tells you what is within reach.
+              <strong>Step inside</strong>Click the room to capture the mouse.
+              Move it freely to look; <kbd>Esc</kbd> releases your cursor.
+              Use <kbd>W A S D</kbd> to walk. On touch screens, use the left
+              joystick and drag with your other thumb. Arrow keys also turn the view.
             </p>
           </div>
           <div>
             <span>02</span>
             <p>
-              <strong>Touch the current</strong>Aim at a drop, then tap it or
-              press <kbd>E</kbd> to pulse. Hold <kbd>Q</kbd> or Gather to draw
-              nearby drops towards you. Press <kbd>F</kbd> or Split to separate
-              a large drop. Every gesture preserves the amount of glass.
+              <strong>Touch the current</strong>Left click to Pulse, right click
+              to Split, and hold <kbd>E</kbd> to Gather. The reticle gently links
+              to nearby glass within reach. Action buttons remain available;
+              <kbd>P</kbd> and <kbd>F</kbd> are keyboard alternatives.
+              Every gesture preserves the amount of glass.
             </p>
           </div>
           <div>

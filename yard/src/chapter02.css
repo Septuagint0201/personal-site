@@ -1606,3 +1606,60 @@ button {
 .liquid-gallery.has-explored .gallery-intro {
   opacity: 0;
 }
+
+/* Cursor capture removes the chrome while leaving a quiet, readable reticle. */
+.capture-prompt {
+  position: absolute; z-index: 3; left: 50%; bottom: 214px; translate: -50% 0;
+  display: flex; align-items: center; flex-direction: column; gap: 11px;
+  color: #b4cddf; font-size: 8px; letter-spacing: .025em; white-space: nowrap;
+}
+.capture-prompt button {
+  display: flex; align-items: center; gap: 20px; padding: 14px 20px;
+  border-radius: 15px; font-size: 11px; letter-spacing: .05em;
+  background: linear-gradient(125deg,#bcddec24,#14202dc9 48%,#bdddef16);
+  box-shadow: inset 0 1px #ecfaff38, inset 0 -2px 4px #a9d3ed17, 0 12px 36px #0005;
+  backdrop-filter: blur(16px); color: #e0f4ff;
+}
+.capture-orbit { width: 18px; height: 18px; border: 1px solid #bbdff2; border-radius: 50%; box-shadow: inset 3px 0 6px #b8dff82b,0 0 14px #92cce82b; }
+.capture-status {
+  position: absolute; z-index: 2; top: 33px; left: 50%; translate: -50% 0;
+  color: #bdd8e5; font-size: 8px; letter-spacing: .16em; display: none; pointer-events: none;
+}
+.capture-status i { display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: #b8e8ee; box-shadow: 0 0 8px #b8e8ee; margin-right: 8px; }
+.capture-status span { display: block; margin-top: 9px; text-align: center; font-size: 8px; letter-spacing: .02em; opacity: .6; }
+.gallery-header,.interaction-dock,.chamber-settings,.room-instrument { transition: opacity .35s; }
+[data-pointer-lock="locked"] .capture-prompt { display: none; }
+[data-gathering="true"] .capture-prompt { opacity: 0; pointer-events: none; }
+[data-pointer-lock="locked"] .capture-status { display: block; }
+[data-pointer-lock="locked"] .gallery-header,
+[data-pointer-lock="locked"] .chamber-settings { opacity: 0; pointer-events: none; }
+[data-pointer-lock="locked"] .interaction-dock { opacity: .2; pointer-events: none; }
+[data-pointer-lock="locked"] .room-instrument { opacity: .5; }
+[data-pointer-lock="locked"] #liquid-canvas { cursor: none; outline: none; }
+.cycle-reading { color: #789baa; font-size: 8px; font-variant-numeric: tabular-nums; }
+.target-distance,.gather-count,.action-echo {
+  position: absolute; left: 50%; translate: -50% 0; white-space: nowrap;
+  font-size: 7px; letter-spacing: .13em; color: #a9d9ea; text-shadow: 0 1px 9px #000;
+}
+.target-distance { top: -24px; opacity: .85; }
+.is-assisted .reticle { color: #b5ecf1; border-radius: 50%; box-shadow: 0 0 22px #ade9ef24; }
+.gather-count { top: 103px; opacity: 0; letter-spacing: .05em; }
+.is-gathering .gather-count { opacity: .9; }
+.action-echo { top: -43px; opacity: 0; transition: opacity .16s; }
+[data-feedback] .action-echo { opacity: .9; }
+[data-feedback="pulse"] .reticle { scale: 1.5; color: #e1ffff; }
+[data-feedback="split"] .reticle { scale: 1.3; rotate: 90deg; color: #ffdcbf; }
+.is-gathering .reticle::after {
+  content: ''; position: absolute; inset: -9px; border: 1px solid #bce9f13d;
+  border-radius: 50%; box-shadow: inset 0 0 18px #a9deee24; animation: current-breath 1.8s ease-in-out infinite;
+}
+@keyframes current-breath { 50% { scale: 1.18; opacity: .4; } }
+@media (max-width: 760px), (pointer: coarse) {
+  .capture-prompt,.capture-status { display: none !important; }
+  .target-distance { font-size: 6px; }
+  .target-action { font-size: 7px; letter-spacing: 0; }
+}
+@media (max-height: 650px) and (min-width: 761px) {
+  .capture-prompt { bottom: 178px; gap: 7px; }
+  .capture-prompt button { padding: 10px 17px; }
+}

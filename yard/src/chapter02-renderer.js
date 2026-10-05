@@ -7,6 +7,7 @@ import {
 import { createLiquidSimulation, MAX_DROPS } from "./liquid-simulation.js";
 import { AREA_LIGHTS, METAL_SEGMENTS } from "./liquid-room.js";
 import { moveWalkingCamera } from "./liquid-camera.js";
+import { findLiquidTarget } from "./liquid-targeting.js";
 
 const subtract = (a, b) => a.map((x, i) => x - b[i]);
 const dot = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
@@ -121,6 +122,8 @@ export function createLiquidRenderer(
     pressedId = null,
     pressTime = -100,
     hoverValue = 0;
+  let targetRay = [0, 0, -1], interactionPoint = [0, 0, 0], interactionTime = -100, interactionKind = 0;
+  let gatherGlow = 0;
   const forward = [0, 0, -1],
     right = [1, 0, 0],
     up = [0, 1, 0];
@@ -273,6 +276,7 @@ export function createLiquidRenderer(
         "clock",
         "effect",
         "effectAge",
+        "interactionPoint", "interactionAge", "interactionKind", "gatherField",
         "selectedDrop",
         "hdr",
       ])
@@ -389,12 +393,9 @@ export function createLiquidRenderer(
     ]);
   }
   function updateTarget() {
-    let hit = simulation.pick(state.position, forward);
-    const obstruction = Math.min(
-      ...METAL_SEGMENTS.map((s) => rayRod(state.position, forward, s)),
-    );
-    if (hit && (hit.distance > 5.0 || obstruction < hit.distance - 0.01))
-      hit = null;
+    const obstruct = ray => Math.min(...METAL_SEGMENTS.map(s => rayRod(state.position, ray, s)));
+    const hit = findLiquidTarget({ origin: state.position, forward,
+      drops: simulation.getDrops(), pick: simulation.pick, obstruction: obstruct, previousId: selectedId });
     const glyph = [3.85, 1.28, -5.97],
       toGlyph = subtract(glyph, state.position),
       glyphDistance = Math.hypot(...toGlyph),
@@ -402,7 +403,8 @@ export function createLiquidRenderer(
     if (
       glyphDistance < 2.45 &&
       alignment > 0.982 &&
-      obstruction > glyphDistance - 0.15
+      obstruct(forward) > glyphDistance - 0.15 &&
+      (!hit || hit.distance > glyphDistance)
     ) {
       target = {
         kind: "glyph",
@@ -422,7 +424,9 @@ export function createLiquidRenderer(
               ? "Glass returning to the frame"
               : "Liquid glass",
         distance: hit.distance,
+        assisted: hit.assisted,
       };
+      targetRay = hit.ray;
       selectedId = hit.id;
     } else {
       target = {
@@ -505,6 +509,7 @@ export function createLiquidRenderer(
       simulation.setAttractor(addScaled(state.position, forward, 1.8));
       heldSeconds += dt;
     } else heldSeconds = 0;
+    gatherGlow += ((gathering ? 1 : 0) - gatherGlow) * Math.min(1, dt * 6);
     if (!state.paused) {
       simulation.update(dt);
       sceneClock += dt;
@@ -540,6 +545,10 @@ export function createLiquidRenderer(
       { resonance: 1, constellation: 2, afterimage: 3 }[effectId] || 0,
     );
     gl.uniform1f(u.effectAge, clock - effectStarted);
+    gl.uniform3fv(u.interactionPoint, interactionPoint);
+    gl.uniform1f(u.interactionAge, motion.matches ? 100 : clock - interactionTime);
+    gl.uniform1i(u.interactionKind, interactionKind);
+    gl.uniform4fv(u.gatherField, [...addScaled(state.position, forward, 1.8), gatherGlow]);
     uploadDrops();
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     const nextHistory = 1 - historyIndex;
@@ -561,6 +570,7 @@ export function createLiquidRenderer(
       !state.paused ||
         gathering ||
         effectId ||
+        clock - interactionTime < 1.5 || gatherGlow > 0.005 ||
         Math.abs(hoverValue - (selectedId !== null ? 1 : 0)) > 0.005 ||
         clock - pressTime < 0.6
         ? 1
@@ -618,6 +628,7 @@ export function createLiquidRenderer(
       convergence < 32 ||
       Math.abs(hoverValue - (selectedId !== null ? 1 : 0)) > 0.005 ||
       clock - pressTime < 0.6
+      || clock - interactionTime < 1.5 || gatherGlow > 0.005
     )
       invalidate();
     else previous = 0;
@@ -701,9 +712,10 @@ export function createLiquidRenderer(
     },
     setGathering,
     interact(mode = "push") {
+      if (!ready || failed || lost || destroyed) return null;
       updateCamera(0);
       updateTarget();
-      if (target.kind === "glyph") {
+      if (target.kind === "glyph" && mode === 'push') {
         onEvent?.({ type: "glyph" });
         invalidate();
         return target;
@@ -712,14 +724,25 @@ export function createLiquidRenderer(
         onEvent?.({ type: "miss" });
         return null;
       }
+      const drop = simulation.getDrops().find(item => item.id === target.id);
+      if (mode === 'split' && (drop.state !== 'free' || drop.radius < 0.135 || simulation.getDrops().length >= MAX_DROPS)) {
+        onEvent?.({ type: 'miss', message: drop.state !== 'free' ? 'Let this drop leave the frame first.' : drop.radius < 0.135 ? 'Gather a little more glass before splitting.' : 'Let two drops join before splitting another.' });
+        return null;
+      }
+      const point = [...drop.position];
       const hit = simulation.interact(
         state.position,
-        forward,
+        targetRay,
         mode === "gather" ? "attract" : mode,
       );
       if (hit) {
         pressedId = target.id;
         pressTime = clock;
+        interactionPoint = point;
+        interactionTime = clock;
+        interactionKind = mode === 'split' ? 2 : 1;
+        convergence = 0;
+        canvas.dataset.lastInteraction = mode;
         onEvent?.({
           type: mode === "split" ? "split-interaction" : "pulse",
           dropId: target.id,
@@ -754,6 +777,7 @@ export function createLiquidRenderer(
       state.yaw = 0;
       state.pitch = -0.045;
       movement = [0, 0];
+      selectedId = null;
       historyValid = false;
       convergence = 0;
       setGathering(false);

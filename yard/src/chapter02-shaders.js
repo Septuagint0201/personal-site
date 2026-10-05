@@ -14,6 +14,10 @@ uniform int rodCount,dropCount,lightCount,bounceLimit,edgeSamples;
 uniform vec4 drops[16],shapes[16],axes[16],velocities[16];
 uniform vec4 lightPositions[8],lightNormals[8],lightTangents[8],lightColors[8];
 uniform float clock,effectAge;
+uniform vec3 interactionPoint;
+uniform float interactionAge;
+uniform int interactionKind;
+uniform vec4 gatherField;
 uniform int effect,selectedDrop;
 uniform bool hdr;
 const float INF=1000.;
@@ -304,6 +308,26 @@ void main(){
    color+=shadeSample(ray,h);material+=float(h.kind)*.2;
   }
   color/=float(edgeSamples);material/=float(edgeSamples);
+ }
+ // Primary-surface accents run once after transport. Keeping this artistic
+ // layer outside the recursive optical branches bounds driver compilation.
+ if(first.kind==1){
+  if(first.id!=1){
+   float horizontal=first.id==0?first.p.z:first.p.x;
+   float seam=1.-smoothstep(.008,.022,abs(fract(horizontal*.4)-.5));
+   float dado=1.-smoothstep(.009,.025,abs(first.p.y-.34));
+   color*=1.-seam*.3-dado*.24;
+  }
+  if(interactionAge<1.5){
+   float d=length(first.p-interactionPoint),front=interactionAge*4.2;
+   float wave=exp(-pow((d-front)*9.,2.))*pow(max(0.,1.-interactionAge/1.5),2.);
+   color+=(interactionKind==2?vec3(.14,.065,.035):vec3(.045,.14,.19))*wave;
+  }
+  if(first.p.y<.02 && gatherField.w>.001){
+   float radius=length(first.p.xz-gatherField.xz);
+   float ring=exp(-pow((radius-1.05)*9.,2.))*.022;
+   color+=vec3(.2,.72,.9)*(ring+.018*exp(-radius*radius*1.8))*gatherField.w;
+  }
  }
  outColor=vec4(hdr?color:pow(aces(color*.85),vec3(1./2.2)),material);
 }`;

@@ -1,6 +1,7 @@
 import { createLiquidRenderer } from "./chapter02-renderer.js";
 import { createGlassAudio } from "./discoveries.js";
 import { createLiquidDiscoveries } from "./liquid-discoveries.js";
+import { createLiquidPointerLock } from "./liquid-pointer-lock.js";
 
 const $ = (selector) => document.querySelector(selector);
 const canvas = $("#liquid-canvas"),
@@ -28,6 +29,7 @@ let stickVector = { x: 0, z: 0 },
   target = null;
 let lastMove = { x: NaN, z: NaN },
   disposed = false;
+let pointerLock, lockFallback = false, feedbackTimer;
 
 function announce(message, duration = 3200) {
   clearTimeout(announceTimeout);
@@ -122,6 +124,10 @@ function hasExplored() {
 }
 let lastTargetMobile = mobile.matches;
 function setTarget(next) {
+  const distance = Number.isFinite(next?.distance) ? `${next.distance.toFixed(1)} m` : '';
+  const reading = next?.kind ? `${next.assisted ? 'LINKED' : 'IN REACH'} / ${distance}` : '';
+  if ($("#target-distance").textContent !== reading) $("#target-distance").textContent = reading;
+  $("#aim-hud").classList.toggle("is-assisted", Boolean(next?.assisted));
   const key = next?.kind ? `${next.kind}:${next.id}` : null;
   const previousKey = target?.kind ? `${target.kind}:${target.id}` : null;
   const unchanged =
@@ -140,28 +146,35 @@ function setTarget(next) {
     next?.kind === "glyph"
       ? mobile.matches
         ? "Touch the mark"
-        : "E / Touch the mark"
+        : "Left click / Touch the mark"
       : next?.kind === "drop"
         ? mobile.matches
           ? "Pulse · Hold Gather · Split"
-          : "E / Pulse · Q / Gather · F / Split"
+          : "Left / Pulse · Hold E / Gather · Right / Split"
         : "";
   $("#pulse-label").textContent = next?.kind === "glyph" ? "Touch" : "Pulse";
   $("#pulse-action").setAttribute(
     "aria-label",
-    next?.kind === "glyph" ? "Touch the mark, E" : "Pulse a drop, E",
+    next?.kind === "glyph" ? "Touch the mark, left click or P" : "Pulse a drop, left click or P",
   );
   if (key !== previousKey)
     $("#target-announcement").textContent = next?.kind
-      ? `${next.label || next.kind}. ${next.kind === "glyph" ? "Press E to touch." : "Press E to pulse, hold Q to gather, F to split."}`
+      ? `${next.label || next.kind}. ${next.kind === "glyph" ? "Left click or press P to touch." : "Left click or P to pulse, hold E to gather, right click or F to split."}`
       : "";
 }
 function handleEvent(event) {
   discoveries.event(event);
-  if (event?.type === "pulse") audio.playChime("hit");
+  if (event?.type === "pulse") { audio.playChime("hit"); actionFeedback("pulse"); }
+  else if (event?.type === "split-interaction") actionFeedback("split");
   else if (event?.type === "split") audio.playChime("gravity");
   else if (event?.type === "miss")
     announce(event.message || "Move closer and aim at a drop", 1700);
+}
+function actionFeedback(kind) {
+  clearTimeout(feedbackTimer);
+  gallery.dataset.feedback = kind;
+  $("#action-echo").textContent = kind === 'split' ? 'SURFACE TENSION / RELEASED' : 'IMPULSE / SENT';
+  feedbackTimer = setTimeout(() => { delete gallery.dataset.feedback; }, 850);
 }
 function initialize() {
   renderer?.dispose();
@@ -191,9 +204,11 @@ function initialize() {
           gallery.dataset.renderScale = scale.toFixed(2);
         if (Number.isFinite(fps)) gallery.dataset.fps = String(Math.round(fps));
       },
-      onStatus({ nearbyCount: nearby = 0, dropCount, volumeRatio } = {}) {
+      onStatus({ nearbyCount: nearby = 0, dropCount, volumeRatio, merges = 0, returns = 0 } = {}) {
         nearbyCount = nearby;
         discoveries.update(nearbyCount);
+        $("#gather-count").textContent = nearby ? `${nearby} drops in the current` : 'Draw the glass closer';
+        $("#cycle-reading").textContent = `${merges} joined · ${returns} returned`;
         if (Number.isFinite(dropCount))
           $("#drop-count").textContent = String(dropCount);
         if (Number.isFinite(volumeRatio))
@@ -202,6 +217,7 @@ function initialize() {
       onTarget: setTarget,
       onEvent: handleEvent,
       onError(error, restoring) {
+        pointerLock?.release();
         resetInput();
         gallery.dataset.renderer = restoring ? "restoring" : "failed";
         loading.hidden = true;
@@ -253,6 +269,7 @@ function setNotesTab(id) {
   }
 }
 function openNotes(tab = "about") {
+  pointerLock?.release();
   resetInput();
   setNotesTab(tab);
   if (!notes.open) notes.showModal();
@@ -291,10 +308,29 @@ notes.addEventListener("click", (event) => {
 });
 notes.addEventListener("close", resetInput);
 function interaction(mode) {
-  if (!renderer || notes.open || document.hidden) return;
+  if (!renderer || gallery.dataset.renderer !== 'ready' || notes.open || document.hidden) return;
   hasExplored();
   renderer.interact(mode);
 }
+pointerLock = createLiquidPointerLock({
+  canvas,
+  canEnter: () => gallery.dataset.renderer === 'ready' && !notes.open && !document.hidden,
+  onChange({ locked, pending }) {
+    gallery.dataset.pointerLock = locked ? 'locked' : pending ? 'pending' : 'free';
+    $("#enter-chamber").disabled = pending;
+    $("#capture-label").textContent = pending ? 'Entering…' : 'Enter the current';
+    for (const element of document.querySelectorAll('.gallery-header,.chamber-settings,.interaction-dock')) element.inert = locked;
+    if (locked) { resetInput(); hasExplored(); }
+  },
+  onLook(dx, dy) { renderer?.look(dx * 0.0018, dy * 0.0018); hasExplored(); },
+  onAction: interaction,
+  onExit: resetInput,
+  onError() {
+    lockFallback = true;
+    announce('Mouse capture is unavailable here. Drag to look, or try Enter again.');
+  },
+});
+$("#enter-chamber").addEventListener('click', () => { lockFallback = false; pointerLock.request(); });
 $("#pulse-action").addEventListener("click", () => interaction("push"));
 $("#split-action").addEventListener("click", () => interaction("split"));
 function setGather(source, value) {
@@ -304,6 +340,7 @@ function setGather(source, value) {
   renderer?.setGathering(active);
   discoveries.setGathering(active);
   gather.setAttribute("aria-pressed", String(active));
+  gallery.dataset.gathering = String(active);
   $("#aim-hud").classList.toggle("is-gathering", active);
   if (active) hasExplored();
 }
@@ -416,6 +453,11 @@ document.querySelectorAll("[data-walk]").forEach((button) => {
   });
 });
 canvas.addEventListener("pointerdown", (event) => {
+  if (event.pointerType === 'mouse') {
+    if (pointerLock.locked || pointerLock.pending) return;
+    if (event.button === 2) { interaction('split'); return; }
+    if (event.button === 0 && !lockFallback) { pointerLock.request(true); return; }
+  }
   if (event.button !== 0 || lookPointer || notes.open) return;
   canvas.focus({ preventScroll: true });
   canvas.setPointerCapture(event.pointerId);
@@ -428,6 +470,7 @@ canvas.addEventListener("pointerdown", (event) => {
   canvas.classList.add("is-looking");
 });
 canvas.addEventListener("pointermove", (event) => {
+  if (pointerLock.locked) return;
   if (!lookPointer || lookPointer.id !== event.pointerId) return;
   const dx = event.clientX - lookPointer.x,
     dy = event.clientY - lookPointer.y;
@@ -478,6 +521,8 @@ function keyboardIsEditing(event) {
   );
 }
 document.addEventListener("keydown", (event) => {
+  if (event.key === 'Escape') resetInput();
+  if (event.key === 'Tab' && pointerLock.locked) pointerLock.release();
   if (
     !renderer ||
     notes.open ||
@@ -501,8 +546,8 @@ document.addEventListener("keydown", (event) => {
       hasExplored();
     }
     startKeyboardLook();
-  } else if (key === "q") setGather("keyboard", true);
-  else if (key === "e" && !event.repeat) interaction("push");
+  } else if (key === "e") setGather("keyboard", true);
+  else if (key === "p" && !event.repeat) interaction("push");
   else if (key === "f" && !event.repeat) interaction("split");
   else if (key === " " && !event.repeat) {
     renderer.setPaused(!renderer.state.paused);
@@ -518,7 +563,7 @@ document.addEventListener("keydown", (event) => {
 document.addEventListener("keyup", (event) => {
   const key = event.key.toLowerCase();
   if (keys.delete(key)) updateMovement();
-  if (key === "q") setGather("keyboard", false);
+  if (key === "e") setGather("keyboard", false);
 });
 function resetInput() {
   keys.clear();
@@ -526,6 +571,7 @@ function resetInput() {
   renderer?.setGathering(false);
   discoveries.resetInput();
   gather.setAttribute("aria-pressed", "false");
+  gallery.dataset.gathering = 'false';
   $("#aim-hud").classList.remove("is-gathering");
   releaseStick();
   if (lookPointer) {
@@ -539,9 +585,9 @@ function resetInput() {
   previousFrame = 0;
   updateMovement();
 }
-window.addEventListener("blur", resetInput);
+window.addEventListener("blur", () => { pointerLock.release(); resetInput(); });
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) resetInput();
+  if (document.hidden) { pointerLock.release(); resetInput(); }
 });
 reducedMotion.addEventListener("change", (event) => {
   if (event.matches && renderer) {
@@ -550,11 +596,14 @@ reducedMotion.addEventListener("change", (event) => {
   }
 });
 window.addEventListener("pagehide", (event) => {
+  pointerLock.release();
   resetInput();
   clearTimeout(announceTimeout);
   clearTimeout(loadingTimeout);
+  clearTimeout(feedbackTimer);
   if (!event.persisted) {
     disposed = true;
+    pointerLock.dispose();
     renderer?.dispose();
     audio.dispose();
   }
