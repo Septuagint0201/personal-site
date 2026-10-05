@@ -76,8 +76,7 @@ export function createLiquidRenderer(
   });
   if (!gl) throw new Error("WebGL 2 is unavailable.");
   const maximumTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
-  const parallel = gl.getExtension("KHR_parallel_shader_compile");
-  const floatTarget = !!gl.getExtension("EXT_color_buffer_float");
+  let parallel, floatTarget;
   const motion = matchMedia("(prefers-reduced-motion: reduce)");
   const mobile = matchMedia("(pointer: coarse)").matches || innerWidth <= 760;
   const state = {
@@ -190,6 +189,10 @@ export function createLiquidRenderer(
     return true;
   }
   function initialize() {
+    // Context restoration disables extensions too. Re-enable them before
+    // polling shader completion or allocating floating-point framebuffer targets.
+    parallel = gl.getExtension("KHR_parallel_shader_compile");
+    floatTarget = !!gl.getExtension("EXT_color_buffer_float");
     ready = false;
     failed = false;
     compilationStarted = performance.now();
