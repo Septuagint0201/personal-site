@@ -5,6 +5,8 @@ export function createLiquidPointerLock({
 }) {
   let pending = false, cancelled = false, disposed = false, skipUntilUp = false;
   let wasLocked = false;
+  let rawSupported = true, attempt = 0, awaitingPromise = false;
+  let anchor = null;
   const removers = [];
   const locked = () => doc.pointerLockElement === canvas;
   const cleanup = () => removers.splice(0).forEach(remove => remove());
@@ -22,6 +24,30 @@ export function createLiquidPointerLock({
     report();
     onError(reason);
   }
+  function capture(raw) {
+    const current = ++attempt;
+    // Promise rejections contain the reason needed to distinguish unsupported
+    // raw input from denied capture. Do not also handle their error event.
+    awaitingPromise = true;
+    function rejected(reason) {
+      if (current !== attempt) return;
+      awaitingPromise = false;
+      if (raw && reason?.name === 'NotSupportedError' && pending && !cancelled && !disposed && canEnter()) {
+        rawSupported = false;
+        capture(false);
+      } else error(reason);
+    }
+    try {
+      const result = raw ? canvas.requestPointerLock({ unadjustedMovement: true }) : canvas.requestPointerLock();
+      if (result?.then) {
+        result.then(() => {
+          if (current !== attempt) return;
+          awaitingPromise = false;
+          if ((cancelled || disposed) && locked()) doc.exitPointerLock();
+        }, rejected);
+      } else awaitingPromise = false;
+    } catch (reason) { rejected(reason); }
+  }
   function request(fromPointerDown = false) {
     if (disposed || pending || locked() || !canEnter()) return false;
     if (typeof canvas.requestPointerLock !== 'function') { onError(); return false; }
@@ -30,18 +56,16 @@ export function createLiquidPointerLock({
     skipUntilUp = fromPointerDown;
     canvas.focus({ preventScroll: true });
     report();
-    try {
-      // Called directly inside the user gesture; works with promise and legacy APIs.
-      canvas.requestPointerLock()?.then(() => {
-        if ((cancelled || disposed) && locked()) doc.exitPointerLock();
-      }).catch(error);
-    } catch { error(); }
+    // Raw relative input bypasses OS acceleration. Older
+    // browsers ignore the option; unsupported platforms retry ordinary capture.
+    capture(rawSupported);
     return true;
   }
   function release() {
     cancelled = true;
     pending = false;
     skipUntilUp = false;
+    anchor = null;
     if (locked()) doc.exitPointerLock();
     report();
   }
@@ -53,17 +77,30 @@ export function createLiquidPointerLock({
       return;
     }
     const active = locked();
+    if (active !== wasLocked) anchor = null;
     if (active) canvas.focus({ preventScroll: true });
     if (!active && wasLocked) { skipUntilUp = false; onExit(); }
     wasLocked = active;
     report();
     if (disposed) cleanup();
   });
-  listen(doc, 'pointerlockerror', error);
+  listen(doc, 'pointerlockerror', event => {
+    const current = attempt;
+    // A synchronous legacy failure still needs reporting. Waiting one microtask
+    // lets capture() establish whether a promise owns this error instead.
+    queueMicrotask(() => { if (current === attempt && !awaitingPromise) error(event); });
+  });
   listen(doc, 'mousemove', event => {
-    if (disposed || !locked() || !canEnter()) return;
-    const dx = Number.isFinite(event.movementX) ? event.movementX : 0;
-    const dy = Number.isFinite(event.movementY) ? event.movementY : 0;
+    if (disposed || !locked() || !canEnter()) { anchor = null; return; }
+    // Absolute coordinates must stay fixed during pointer lock. Establish the
+    // baseline on acquisition, and discard a packet that relocates it (e.g.
+    // cursor recentering / a changed window origin), never its warp-sized delta.
+    // Do not clamp relative motion: fast turns and coalesced packets are valid.
+    const next = [event.clientX, event.clientY, event.screenX, event.screenY];
+    const rebased = !anchor || next.some((value, i) => Number.isFinite(value) && Number.isFinite(anchor[i]) && value !== anchor[i]);
+    anchor = next;
+    if (rebased || !Number.isFinite(event.movementX) || !Number.isFinite(event.movementY)) return;
+    const dx = event.movementX, dy = event.movementY;
     if (dx || dy) onLook(dx, dy);
   });
   listen(doc, 'mousedown', event => {
