@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { writeEllipsoidTransform } from '../src/liquid-optics.js';
+import { writeEllipsoidTransform, packCapsuleGroups, METAL_GROUP_SIZE, METAL_SEGMENT_CAPACITY } from '../src/liquid-optics.js';
 import { createLiquidSimulation } from '../src/liquid-simulation.js';
+import { METAL_SEGMENTS } from '../src/liquid-room.js';
 
 const dot = (a,b) => a.reduce((sum,v,i)=>sum+v*b[i],0);
 const close = (a,b,tolerance=2e-5) => assert.ok(Math.abs(a-b)<tolerance, `${a} != ${b}`);
@@ -39,4 +40,30 @@ test('precomputed GPU transforms intersect the same surface as interaction picki
 test('tiny attached parcels and pressed scaling keep the original optical minimum radius',()=>{
   const rows=pack({orientation:[0,1,0],radius:.001,deform:[.5,1,2]},.96);
   rows.forEach(row=>{close(row[3],.006);assert.ok(Array.from(row).every(Number.isFinite));});
+});
+
+test('Float32 metal bounds conservatively enclose every capsule including rounded ends',()=>{
+  const {low,high}=packCapsuleGroups(METAL_SEGMENTS);
+  METAL_SEGMENTS.forEach((segment,index)=>{
+    const offset=Math.floor(index/METAL_GROUP_SIZE)*4;
+    for(let axis=0;axis<3;axis++) {
+      // These extrema enclose the full Minkowski sum of segment and sphere,
+      // including axis-parallel and grazing rays at either spherical end.
+      const minimum=Math.min(segment.a[axis],segment.b[axis])-segment.radius;
+      const maximum=Math.max(segment.a[axis],segment.b[axis])+segment.radius;
+      assert.ok(low[offset+axis]<minimum);
+      assert.ok(high[offset+axis]>maximum);
+    }
+  });
+});
+
+test('bounds retain an incomplete last group and reject capacity overflow',()=>{
+  const list=METAL_SEGMENTS.slice(0,METAL_GROUP_SIZE+1);
+  const {low,high}=packCapsuleGroups(list);
+  const last=list.at(-1);
+  for(let axis=0;axis<3;axis++) {
+    assert.ok(low[4+axis]<Math.min(last.a[axis],last.b[axis])-last.radius);
+    assert.ok(high[4+axis]>Math.max(last.a[axis],last.b[axis])+last.radius);
+  }
+  assert.throws(()=>packCapsuleGroups(Array(METAL_SEGMENT_CAPACITY+1).fill(last)),RangeError);
 });

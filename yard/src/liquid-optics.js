@@ -1,3 +1,26 @@
+import { METAL_SEGMENTS } from './liquid-room.js';
+
+export const METAL_GROUP_SIZE = 2;
+export const METAL_SEGMENT_CAPACITY = METAL_SEGMENTS.length;
+export const MAX_METAL_GROUPS = Math.ceil(METAL_SEGMENT_CAPACITY / METAL_GROUP_SIZE);
+
+/** Conservative bounds preserve segment order, including ties at shared bends. */
+export function packCapsuleGroups(segments) {
+  if (segments.length > METAL_SEGMENT_CAPACITY)
+    throw new RangeError('Too many metal segments for the optical pipeline.');
+  const low = new Float32Array(MAX_METAL_GROUPS * 4);
+  const high = new Float32Array(MAX_METAL_GROUPS * 4);
+  for (let start = 0; start < segments.length; start += METAL_GROUP_SIZE) {
+    const group = segments.slice(start, start + METAL_GROUP_SIZE);
+    const offset = start / METAL_GROUP_SIZE * 4;
+    for (let axis = 0; axis < 3; axis++) {
+      low[offset + axis] = Math.min(...group.map(s => Math.min(s.a[axis], s.b[axis]) - s.radius)) - .0002;
+      high[offset + axis] = Math.max(...group.map(s => Math.max(s.a[axis], s.b[axis]) + s.radius)) + .0002;
+    }
+  }
+  return { low, high };
+}
+
 /** Write the inverse ellipsoid transform once per drop, shared by all its rays.
  * XYZ stores a basis vector divided by its radius; W retains the world radius.
  * The pole convention matches liquid-simulation's exact picking transform.

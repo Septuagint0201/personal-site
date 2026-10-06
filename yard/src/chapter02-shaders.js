@@ -1,3 +1,5 @@
+import { METAL_GROUP_SIZE, MAX_METAL_GROUPS, METAL_SEGMENT_CAPACITY } from './liquid-optics.js';
+
 // Analytic capsule/ellipsoid light transport. Merging pairs alone use a local
 // smooth distance field; the rest of the room stays sharp and inexpensive.
 export const vertexSource = `#version 300 es
@@ -9,7 +11,8 @@ precision highp int;
 out vec4 outColor;
 uniform vec2 resolution,jitter;
 uniform vec3 cameraPosition,cameraForward,cameraRight,cameraUp;
-uniform vec4 rodsA[32],rodsB[32];
+uniform vec4 rodsA[${METAL_SEGMENT_CAPACITY}],rodsB[${METAL_SEGMENT_CAPACITY}];
+uniform vec4 rodBoundsLow[${MAX_METAL_GROUPS}],rodBoundsHigh[${MAX_METAL_GROUPS}];
 uniform int rodCount,dropCount,lightCount,bounceLimit,edgeSamples;
 uniform vec4 drops[16],shapes[16],dropX[16],dropY[16],dropZ[16],velocities[16];
 uniform vec4 lightPositions[8],lightNormals[8],lightTangents[8],lightColors[8];
@@ -81,6 +84,11 @@ float pairHit(vec3 ro,vec3 rd,int i,int j,float maximum){
  return INF;
 }
 vec3 pairNormal(vec3 p,int i,int j){vec2 e=vec2(.0013,0.);return normalize(vec3(pairDistance(p+e.xyy,i,j)-pairDistance(p-e.xyy,i,j),pairDistance(p+e.yxy,i,j)-pairDistance(p-e.yxy,i,j),pairDistance(p+e.yyx,i,j)-pairDistance(p-e.yyx,i,j)));}
+bool metalGroupHit(vec3 ro,vec3 inverseRay,int group,float maximum){
+ vec3 a=(rodBoundsLow[group].xyz-ro)*inverseRay,b=(rodBoundsHigh[group].xyz-ro)*inverseRay;
+ vec3 near=min(a,b),far=max(a,b);
+ return max(EPS,max(near.x,max(near.y,near.z)))<=min(maximum,min(far.x,min(far.y,far.z)));
+}
 Hit intersectScene(vec3 ro,vec3 rd){
  Hit hit;hit.t=INF;hit.kind=0;hit.id=-1;hit.n=vec3(0.,1.,0.);
  vec3 low=vec3(-5.,0.,-6.),high=vec3(5.,5.,6.);
@@ -89,10 +97,17 @@ Hit intersectScene(vec3 ro,vec3 rd){
   float t=((rd[axis]>0.?high[axis]:low[axis])-ro[axis])/rd[axis];
   if(t>EPS && t<hit.t){hit.t=t;hit.n=vec3(0.);hit.n[axis]=rd[axis]>0.?-1.:1.;hit.kind=1;hit.id=axis;}
  }
- for(int i=0;i<32;i++){
-  if(i>=rodCount)break;
-  float t=capsule(ro,rd,rodsA[i].xyz,rodsB[i].xyz,rodsA[i].w,rodsB[i].w);
-  if(t<hit.t){hit.t=t;hit.kind=2;hit.id=i;}
+ // One conservative box test can skip adjacent segments at a bend. A finite
+ // reciprocal also handles axis-parallel rays without zero-times-infinity NaNs.
+ vec3 inverseRay=mix(vec3(-1.),vec3(1.),greaterThanEqual(rd,vec3(0.)))/max(abs(rd),vec3(1.e-20));
+ for(int group=0;group<${MAX_METAL_GROUPS};group++){
+  if(group*${METAL_GROUP_SIZE}>=rodCount)break;
+  if(!metalGroupHit(ro,inverseRay,group,hit.t))continue;
+  for(int member=0;member<${METAL_GROUP_SIZE};member++){
+   int i=group*${METAL_GROUP_SIZE}+member;if(i>=rodCount)break;
+   float t=capsule(ro,rd,rodsA[i].xyz,rodsB[i].xyz,rodsA[i].w,rodsB[i].w);
+   if(t<hit.t){hit.t=t;hit.kind=2;hit.id=i;}
+  }
  }
  for(int i=0;i<16;i++){
   if(i>=dropCount)break;
@@ -219,7 +234,7 @@ vec3 fastReflection(vec3 ro,vec3 rd){
  }
  return weight*vec3(.035,.057,.080);
 }
-vec3 transport(vec3 ro,vec3 rd,Hit first,float wavelength,out bool touchedGlass){
+vec3 transport(vec3 ro,vec3 rd,Hit first,inout vec3 firstReflection,inout bool reflectionReady,float wavelength,out bool touchedGlass){
  vec3 total=vec3(0.),weight=vec3(1.);Hit hit=first;bool inGlass=false;
  touchedGlass=false;
  vec3 originDx=vec3(0.),originDy=vec3(0.),directionDx=vec3(0.),directionDy=vec3(0.);
@@ -257,13 +272,20 @@ vec3 transport(vec3 ro,vec3 rd,Hit first,float wavelength,out bool touchedGlass)
    if(dot(transmitted,transmitted)<.001){rd=reflect(rd,normal);}
    else{
     vec3 reflected=reflect(rd,normal);
-    total+=weight*fresnel*fastReflection(rayOrigin(hit,reflected),reflected);
+    vec3 reflectedLight=firstReflection;
+    if(bounce!=0 || !reflectionReady){
+     reflectedLight=fastReflection(rayOrigin(hit,reflected),reflected);
+     if(bounce==0){firstReflection=reflectedLight;reflectionReady=true;}
+    }
+    total+=weight*fresnel*reflectedLight;
     weight*=1.-fresnel;rd=normalize(transmitted);inGlass=!leaving;
    }
    if(selectedDrop>=0 && (hit.id==selectedDrop || int(shapes[hit.id].w)-1==selectedDrop))total+=weight*vec3(.015,.08,.12)*pow(1.-abs(dot(rd,normal)),2.);
    if(effect==2)total+=weight*vec3(.008,.024,.034);
   }
   else break;
+  // The next hit is unused after the final permitted interaction.
+  if(bounce+1>=bounceLimit)break;
   ro=rayOrigin(hit,rd);hit=intersectScene(ro,rd);
  }
  return total;
@@ -274,13 +296,17 @@ vec3 shadeSample(vec3 rd,Hit first){
  if(first.kind==1){color=max(wallLight(first),diffuseRoom(first));}
  else{
   bool touchedGlass=true;color=vec3(0.);
+  // Before refraction, all three wavelengths share the same incident ray and
+  // reflected branch. Cache it on demand so total internal reflection does not
+  // introduce an unused branch when the camera is inside a droplet.
+  vec3 firstReflection=vec3(0.);bool reflectionReady=false;
   // Metal-only paths are achromatic. Only trace the remaining wavelengths when
   // the primary path actually encounters glass; reflections stay full RGB.
   for(int channel=0;channel<3;channel++){
    if(channel>0 && !touchedGlass)break;
    bool encountered;
    float wavelength=channel==0?0.:channel==1?-1.:1.;
-   vec3 spectral=transport(cameraPosition,rd,first,wavelength,encountered);
+   vec3 spectral=transport(cameraPosition,rd,first,firstReflection,reflectionReady,wavelength,encountered);
    if(channel==0){color=spectral;touchedGlass=encountered;}
    else if(channel==1)color.r=spectral.r;
    else color.b=spectral.b;
@@ -379,7 +405,7 @@ void main(){
   // Local geometric occlusion anchors the framework at its wall/floor contacts.
   // It is intentionally evaluated only on the visible room, outside transport.
   float occlusion=0.;
-  for(int i=0;i<32;i++){
+  for(int i=0;i<${METAL_SEGMENT_CAPACITY};i++){
    if(i>=rodCount)break;
    vec3 ab=rodsB[i].xyz-rodsA[i].xyz;
    vec3 closest=rodsA[i].xyz+ab*clamp(dot(first.p-rodsA[i].xyz,ab)/dot(ab,ab),0.,1.);

@@ -10,7 +10,7 @@ import { createLiquidSimulation, MAX_DROPS } from "./liquid-simulation.js";
 import { AREA_LIGHTS, METAL_SEGMENTS } from "./liquid-room.js";
 import { moveWalkingCamera } from "./liquid-camera.js";
 import { findLiquidTarget } from "./liquid-targeting.js";
-import { writeEllipsoidTransform } from "./liquid-optics.js";
+import { writeEllipsoidTransform, packCapsuleGroups } from "./liquid-optics.js";
 
 const subtract = (a, b) => a.map((x, i) => x - b[i]);
 const dot = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
@@ -285,6 +285,7 @@ export function createLiquidRenderer(
         "cameraUp",
         "rodsA[0]",
         "rodsB[0]",
+        "rodBoundsLow[0]", "rodBoundsHigh[0]",
         "rodCount",
         "dropCount",
         "lightCount",
@@ -322,14 +323,17 @@ export function createLiquidRenderer(
       for (const entry of [trace, room]) {
         const u = entry.uniforms;
         gl.useProgram(entry.program);
-        const rodA = new Float32Array(32 * 4),
-          rodB = new Float32Array(32 * 4);
+        const rodA = new Float32Array(METAL_SEGMENTS.length * 4),
+          rodB = new Float32Array(METAL_SEGMENTS.length * 4);
         METAL_SEGMENTS.forEach((s, i) => {
           rodA.set([...s.a, s.radius], i * 4);
           rodB.set([...s.b, 1 / Math.hypot(...subtract(s.b, s.a))], i * 4);
         });
         gl.uniform4fv(u["rodsA[0]"], rodA);
         gl.uniform4fv(u["rodsB[0]"], rodB);
+        const bounds = packCapsuleGroups(METAL_SEGMENTS);
+        gl.uniform4fv(u["rodBoundsLow[0]"], bounds.low);
+        gl.uniform4fv(u["rodBoundsHigh[0]"], bounds.high);
         gl.uniform1i(u.rodCount, METAL_SEGMENTS.length);
         const lp = new Float32Array(32),
           ln = new Float32Array(32),

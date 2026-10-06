@@ -9,14 +9,16 @@ Choose Entrance, Close glass or Side wall. Query options:
 - `?baseline` loads the ignored `tools/.baseline/` source copy.
 - `?quality=high` selects High; the default is Ultra.
 - `?time=1` advances the deterministic scene for 60 frames before freezing it.
+- `?view=close` or `?view=side` starts directly at that view.
+- `?effect=resonance`, `?effect=constellation` or `?effect=afterimage` exercises a discovery's optical path without modifying saved discoveries.
 - Combine options with `&`, for example `?baseline&quality=high`.
 
-Create the reference copy before changing production code, or extract a known revision. For the comparison below, run this PowerShell from `yard/`:
+Create the reference copy before changing production code, or extract a known revision. For the latest comparison, run this PowerShell from `yard/`:
 
 ```powershell
 New-Item -ItemType Directory -Force tools/.baseline
 $referenceArchive = Join-Path ([IO.Path]::GetTempPath()) ('yard-reference-' + [guid]::NewGuid() + '.tar')
-git archive --format=tar "--output=$referenceArchive" dc95d00e1c5b25a5b2496321ef1fc87d5d690a2e:yard/src
+git archive --format=tar "--output=$referenceArchive" 5233cc21e9340271e6da00824e9a829ee4e5dc01:yard/src
 tar -xf $referenceArchive -C tools/.baseline
 Remove-Item -LiteralPath $referenceArchive
 ```
@@ -40,3 +42,22 @@ Reference: `dc95d00` before ellipsoid precomputation and intersection early-outs
 The narrow High run uses the same desktop GPU; it is not a phone GPU measurement. These times do not predict end-to-end FPS or guarantee gains on other hardware.
 
 Matching RGB8 buffer comparisons across these five views had mean absolute channel error of 0.00043–0.00352 on a 0–255 scale and PSNR of 54.1–66.9 dB. The 99th percentile channel error was zero in every view; sparse differences occur at glass/grazing boundaries due to floating-point rounding. No optical effect, model, sample count or quality setting was removed. These snapshots supplement interaction and context-restoration checks; they do not exhaust all camera angles or liquid states.
+
+## Spatial bounds and shared first reflection — 2026-10-07
+
+Reference: `5233cc2`, the previous deployed optimization. Same RTX 4080 Laptop / ANGLE Direct3D11 setup, 96 measured frames per view, Ultra buffer 2080 × 1170. Each final comparison navigates directly to its preset with the same fixture and sampling sequence; the optical quality settings are unchanged. GPU time is the entire eight-pass pipeline.
+
+| Scene | Reference GPU ms | Optimized GPU ms | Reduction |
+| --- | ---: | ---: | ---: |
+| Entrance | 13.18 | 12.83 | 2.6% |
+| Close glass | 22.88 | 15.58 | 31.9% |
+| Side wall | 13.03 | 9.70 | 25.5% |
+| Entrance after 1 s of simulation | 17.54 | 15.43 | 12.0% |
+| Close glass / Resonance | 22.70 | 15.75 | 30.6% |
+| Close glass / Constellation | 36.58 | 27.10 | 25.9% |
+| Close glass / Afterimage | 29.75 | 22.27 | 25.1% |
+| High, 390 × 844 render buffer | 2.42 | 1.84 | 23.7% |
+
+Entrance remains essentially unchanged within small timing variations. The largest gains occur on paths with repeated geometry intersections and glass reflections. The High run uses a narrow viewport on the same desktop GPU, not a physical phone. Results are GPU workload measurements, not guaranteed display FPS.
+
+Five of the eight RGB8 comparisons were pixel-identical: entrance, close glass, flowing snapshot, Afterimage and High. The other comparisons changed 532–962 of 2,433,600 pixels (at least 99.96% unchanged), with mean absolute channel error of 0.00073–0.00146 on the 0–255 scale. These sparse boundary differences remain within the previous floating-point comparison scale. All three discovery render paths, production quality defaults and graphics-context restoration were checked. No resolution, material, geometry, spectral channel, ray-depth or anti-aliasing setting was reduced.

@@ -1,7 +1,7 @@
 // Development-only: Vite's production page list excludes this harness.
 // ?baseline loads a local .baseline copy; ?quality=high exercises that preset.
 const params = new URLSearchParams(location.search);
-const { createLiquidRenderer } = await import(params.has('baseline')
+const { createLiquidRenderer } = await import(/* @vite-ignore */ params.has('baseline')
   ? './.baseline/chapter02-renderer.js' : '../src/chapter02-renderer.js');
 const canvas = document.querySelector('canvas');
 const result = document.querySelector('#result');
@@ -15,6 +15,8 @@ window.requestAnimationFrame = callback => nativeRaf(()=>callback(fixedTime+=100
 const stages = ['trace', 'room', 'temporal', 'bloom 1', 'bloom 2', 'bloom 3', 'bloom 4', 'resolve'];
 const median = values => [...values].sort((a,b)=>a-b)[Math.floor(values.length/2)];
 const presets = { entrance: [[0,1.65,4.5],0,-.045], close: [[.3,1.65,.8],0,-.15], side: [[0,1.65,2],1.1,-.05] };
+const initialPreset = Object.hasOwn(presets, params.get('view')) ? params.get('view') : 'entrance';
+const activeEffect = ['resonance', 'constellation', 'afterimage'].includes(params.get('effect')) ? params.get('effect') : null;
 let preset = 'entrance';
 function collect() {
   const disjoint = timer && gl.getParameter(timer.GPU_DISJOINT_EXT);
@@ -33,6 +35,7 @@ function finish() {
   const complete = [...byFrame.values()].filter(group=>group.length===stages.length).map(group=>group.reduce((a,b)=>a+b,0));
   window.benchResult = {
     version: params.has('baseline') ? 'baseline' : 'current', preset,
+    effect: activeEffect, simulationTime: Number(params.get('time') || 0),
     quality: renderer.state.quality, resolution: [canvas.width,canvas.height],
     gpuTimer: Boolean(timer), frames: timer ? complete.length : cpu.length,
     frameMs: median(timer ? complete : cpu),
@@ -50,7 +53,7 @@ canvas.getContext = (...args) => {
   gl.drawArrays = (...drawArgs) => {
     if (!running) {
       draw(...drawArgs);
-      if(preroll>0 && boundFramebuffer===null && --preroll===0){renderer.setPaused(true);requestAnimationFrame(()=>run('entrance'));}
+      if(preroll>0 && boundFramebuffer===null && --preroll===0){renderer.setPaused(true);requestAnimationFrame(()=>run(initialPreset));}
       return;
     }
     const stage = drawIndex++ % stages.length;
@@ -63,6 +66,7 @@ canvas.getContext = (...args) => {
       if (!timer) gl.finish();
       if (frameIndex>=16) cpu.push(performance.now()-firstDraw);
       frameIndex++;
+      if(frameIndex%16===0)document.body.dataset.frames=String(frameIndex);
       if (frameIndex < 112) renderer.look(0,0);
       else {
         running=false;
@@ -80,11 +84,12 @@ function run(name) {
   renderer.state.position=[...position]; renderer.state.yaw=yaw; renderer.state.pitch=pitch;
   pending.forEach(p=>gl.deleteQuery(p.query)); pending=[]; samples=[]; cpu=[];
   frameIndex=0;drawIndex=0;running=true;
+  document.body.dataset.frames='0';
   document.body.dataset.status='running';result.textContent='Measuring '+name+'…';
   renderer.look(0,0);
 }
 renderer=createLiquidRenderer(canvas,{
-  onReady(){renderer.setPaused(preroll===0);renderer.setQuality(params.get('quality')==='high'?'high':'ultra');if(!preroll)requestAnimationFrame(()=>run('entrance'));},
+  onReady(){renderer.setPaused(preroll===0);renderer.setQuality(params.get('quality')==='high'?'high':'ultra');if(activeEffect)renderer.setEffect(activeEffect,1e9);if(!preroll)requestAnimationFrame(()=>run(initialPreset));},
   onError(error){result.textContent=String(error);document.body.dataset.status='failed';},
 });
 Object.keys(presets).forEach(name=>document.getElementById(name).onclick=()=>run(name));
