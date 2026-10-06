@@ -18,7 +18,7 @@ Create the reference copy before changing production code, or extract a known re
 ```powershell
 New-Item -ItemType Directory -Force tools/.baseline
 $referenceArchive = Join-Path ([IO.Path]::GetTempPath()) ('yard-reference-' + [guid]::NewGuid() + '.tar')
-git archive --format=tar "--output=$referenceArchive" 5233cc21e9340271e6da00824e9a829ee4e5dc01:yard/src
+git archive --format=tar "--output=$referenceArchive" 683246ab0519a1c14a5e01d897fc7b427db3f76b:yard/src
 tar -xf $referenceArchive -C tools/.baseline
 Remove-Item -LiteralPath $referenceArchive
 ```
@@ -61,3 +61,22 @@ Reference: `5233cc2`, the previous deployed optimization. Same RTX 4080 Laptop /
 Entrance remains essentially unchanged within small timing variations. The largest gains occur on paths with repeated geometry intersections and glass reflections. The High run uses a narrow viewport on the same desktop GPU, not a physical phone. Results are GPU workload measurements, not guaranteed display FPS.
 
 Five of the eight RGB8 comparisons were pixel-identical: entrance, close glass, flowing snapshot, Afterimage and High. The other comparisons changed 532–962 of 2,433,600 pixels (at least 99.96% unchanged), with mean absolute channel error of 0.00073–0.00146 on the 0–255 scale. These sparse boundary differences remain within the previous floating-point comparison scale. All three discovery render paths, production quality defaults and graphics-context restoration were checked. No resolution, material, geometry, spectral channel, ray-depth or anti-aliasing setting was reduced.
+
+## Discovery bounds and reflected-interface reuse — 2026-10-07
+
+Reference: `683246a`, including the previous optimization and pointer-lock fix. Sequential comparisons in the same browser/GPU session, with 96 complete measured frames for each view. Ultra remains 2080 × 1170. Compare within this table: GPU timings vary between sessions.
+
+| Scene | Reference GPU ms | Optimized GPU ms | Reduction |
+| --- | ---: | ---: | ---: |
+| Entrance | 11.16 | 10.69 | 4.3% |
+| Close glass | 13.39 | 13.06 | 2.5% |
+| Side wall | 8.55 | 8.40 | 1.8% |
+| Entrance after 1 s of simulation | 13.74 | 13.37 | 2.7% |
+| Close glass / Resonance | 13.40 | 13.24 | 1.2% |
+| Close glass / Constellation | 22.57 | 20.29 | 10.1% |
+| Close glass / Afterimage | 18.42 | 16.66 | 9.6% |
+| High, 390 × 844 render buffer | 1.84 | 1.75 | 4.8% |
+
+Repeat comparisons retained 9.5% for Constellation and 8.8% for Afterimage, including reversed run order for the latter. Smaller gains are close to timing variation; the discovery paths are the clearest improvement. The narrow High run uses the desktop GPU and does not measure phone hardware or end-to-end FPS.
+
+All six non-trail snapshots were pixel-identical. Constellation changed 850 pixels and Afterimage 501 of 2,433,600, leaving at least 99.965% unchanged; mean absolute channel error was 0.00096 and 0.00090 on the 0–255 scale. These snapshots are limited coverage, not a proof for every view. Resolution, spectral transport, ray depth, AA, bloom, materials and geometry remain unchanged. A separate static-frame uniform-buffer experiment was discarded because its roughly 1% gain did not justify the additional buffer and lifecycle code.

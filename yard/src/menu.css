@@ -1187,6 +1187,7 @@ h1:hover,
 :root {
   --card-left: clamp(255px, 25vw, 380px);
   --card-right: clamp(125px, 13.5vw, 205px);
+  --card-inset: clamp(14px, 2vw, 32px);
 }
 html,
 body {
@@ -1266,8 +1267,8 @@ main {
 }
 .card-stack {
   top: calc(50% - var(--card-height) / 2);
-  left: var(--card-left);
-  width: calc(100% - var(--card-left) - var(--card-right));
+  left: calc(var(--card-left) + var(--card-inset));
+  width: calc(100% - var(--card-left) - var(--card-right) - 2 * var(--card-inset));
   height: var(--card-height);
   pointer-events: none;
 }
@@ -1555,6 +1556,7 @@ main {
   :root {
     --card-left: 48px;
     --card-right: 66px;
+    --card-inset: 6px;
   }
   .collection-header {
     padding: 0;
