@@ -7,7 +7,7 @@ I'm glad you stopped by. I hope you find something interesting here that brings 
 本仓库同时维护两个网站：
 
 - 根目录：Candy 个人主页，部署于 https://candy-spt.com/ 。
-- [`yard/`](yard/README.md)：YARD 章节目录、第一章玻璃光学展厅及后续章节，独立构建并部署于 https://yard.septuagint21.org/ 。
+- [`yard/`](yard/README.md)：YARD 章节目录、第一章玻璃光学展厅和第二章液态玻璃展厅，独立构建并部署于 https://yard.septuagint21.org/ 。
 
 YARD 使用站点根路径；在 `yard/` 内运行，不直接作为 Candy 的 `/yard/` 子路径发布：
 
@@ -15,10 +15,13 @@ YARD 使用站点根路径；在 `yard/` 内运行，不直接作为 Candy 的 `
 cd yard
 npm ci
 npm run dev
+npm test
 npm run build
 ```
 
 `yard/dist/` 是 YARD 的部署产物，构建会为目录及各章节生成 `index.html` 和适配现有 Nginx 的 `yard.html`。源码、封面、依赖锁文件和第三方许可证均纳入 Git；`node_modules/`、`dist/` 与日志仅留在开发目录，不纳入提交。
+
+根目录 `.gitattributes` 统一文本文件使用 LF 换行，二进制文件由 Git 自动识别。日常维护可从仓库根目录运行 `npm test --prefix yard`、`npm run build --prefix yard` 和 `npm audit --prefix yard`。`yard/tools/.baseline/` 是本地性能对比基线；两套 Lab 和未启用的封面仍作为开发素材保留。
 
 本机开发仓库位于 `E:\AMLY\works\HTML\personal-site`。原独立的 `E:\AMLY\works\HTML\yard` 已删除，后续统一在本仓库的 `yard/` 子目录开发。
 

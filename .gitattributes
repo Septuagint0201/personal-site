@@ -1,0 +1,2 @@
+# Keep source checkouts consistent across Windows and other development hosts.
+* text=auto eol=lf

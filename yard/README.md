@@ -29,6 +29,7 @@ Requires Node.js 22.12+ (developed with Node 26). Dependencies are pinned in pac
 ```sh
 npm ci
 npm run dev
+npm test
 npm run build
 ```
 
@@ -100,4 +101,4 @@ The original welcome page is preserved in the first deployment backup. Roll back
 
 ## Verification
 
-Run `node --test tests/*.test.js` for orbit/clipping, body collision, liquid lifecycle, deterministic frame-rate independence, five-minute volume conservation and discovery timing. Production build and JavaScript syntax are checked before deployment. Browser checks cover coordinate clicks after preview, room walking, Gather/release, the far-wall interaction, mobile controls, quality defaults and responsive layouts. Actual performance depends on GPU/browser and is not a guaranteed frame rate.
+Run `npm test` (or `npm test --prefix yard` from the repository root) for orbit/clipping, body collision, liquid lifecycle, deterministic frame-rate independence, five-minute volume conservation and discovery timing. Production build and JavaScript syntax are checked before deployment. Browser checks cover coordinate clicks after preview, room walking, Gather/release, the far-wall interaction, mobile controls, quality defaults and responsive layouts. Actual performance depends on GPU/browser and is not a guaranteed frame rate.
