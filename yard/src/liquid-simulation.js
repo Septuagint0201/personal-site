@@ -297,6 +297,8 @@ export function createLiquidSimulation({
       childId: child.id,
       reason,
       volume: originalVolume,
+      position: [...originalPosition],
+      radius: originalRadius,
     });
     return { type: "split", dropId: drop.id, childId: child.id, reason };
   }
@@ -323,7 +325,10 @@ export function createLiquidSimulation({
     drops.splice(drops.indexOf(b), 1);
     for (const drop of drops) if (drop.bridgeTo === b.id) drop.bridgeTo = null;
     counters.merges++;
-    emit("merge", { dropId: a.id, consumedId: b.id, volume: total });
+    emit("merge", {
+      dropId: a.id, consumedId: b.id, volume: total,
+      position: [...a.position], radius: a.radius,
+    });
   }
 
   function beginDrain(drop, segmentIndex, closest) {
@@ -346,7 +351,10 @@ export function createLiquidSimulation({
     drop.velocity = [0, 0, 0];
     drop.highlight = Math.max(drop.highlight, 0.45);
     counters.returns++;
-    emit("return", { dropId: drop.id, segmentIndex, volume: drop.volume });
+    emit("return", {
+      dropId: drop.id, segmentIndex, volume: drop.volume,
+      position: [...drop.position], radius: drop.radius,
+    });
   }
 
   function updateFormation(drop, dt) {
@@ -384,6 +392,8 @@ export function createLiquidSimulation({
         dropId: drop.id,
         emitterId: site.id,
         volume: drop.volume,
+        position: [...drop.position],
+        radius: drop.radius,
       });
     }
   }

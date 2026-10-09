@@ -830,6 +830,8 @@ export function createLiquidRenderer(
         onEvent?.({
           type: mode === "split" ? "split-interaction" : "pulse",
           dropId: target.id,
+          position: point,
+          radius: drop.radius,
         });
         invalidate();
       }

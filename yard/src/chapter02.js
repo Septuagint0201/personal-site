@@ -1,5 +1,5 @@
 import { createLiquidRenderer } from "./chapter02-renderer.js";
-import { createGlassAudio } from "./discoveries.js";
+import { createLiquidAudio } from "./liquid-audio.js";
 import { createLiquidDiscoveries } from "./liquid-discoveries.js";
 import { createLiquidPointerLock } from "./liquid-pointer-lock.js";
 
@@ -40,19 +40,20 @@ function announce(message, duration = 3200) {
     duration,
   );
 }
-const audio = createGlassAudio((enabled, reason) => {
-  $("#sound-toggle").setAttribute("aria-pressed", String(enabled));
-  $("#sound-label").textContent = enabled ? "Sound on" : "Sound off";
-  $("#sound-toggle").setAttribute(
-    "aria-label",
-    enabled ? "Turn sound off" : "Turn sound on",
-  );
-  if (reason) announce(reason);
+const audio = createLiquidAudio({
+  onChange(enabled, reason) {
+    $("#sound-toggle").setAttribute("aria-pressed", String(enabled));
+    $("#sound-label").textContent = enabled ? "Sound on" : "Sound off";
+    $("#sound-toggle").setAttribute(
+      "aria-label",
+      enabled ? "Turn sound off" : "Turn sound on",
+    );
+    if (reason) announce(reason);
+  },
 });
 const discoveries = createLiquidDiscoveries({
   onDiscover(entry, count) {
     renderer?.setEffect(entry.id, entry.duration);
-    audio.playChime(entry.id);
     renderDiscoveries();
     announce(`Discovery ${count} / 3 — ${entry.name}. ${entry.message}`, 5500);
     gallery.dataset.lastDiscovery = entry.id;
@@ -93,7 +94,6 @@ function renderDiscoveries() {
         replay.addEventListener("click", () => {
           notes.close();
           renderer?.setEffect(entry.id, entry.duration);
-          audio.playChime(entry.id);
           announce(entry.message, 4200);
         });
         item.append(replay);
@@ -164,9 +164,9 @@ function setTarget(next) {
 }
 function handleEvent(event) {
   discoveries.event(event);
-  if (event?.type === "pulse") { audio.playChime("hit"); actionFeedback("pulse"); }
+  audio.play(event, renderer?.state);
+  if (event?.type === "pulse") actionFeedback("pulse");
   else if (event?.type === "split-interaction") actionFeedback("split");
-  else if (event?.type === "split") audio.playChime("gravity");
   else if (event?.type === "miss")
     announce(event.message || "Move closer and aim at a drop", 1700);
 }
@@ -207,6 +207,7 @@ function initialize() {
       onStatus({ nearbyCount: nearby = 0, dropCount, volumeRatio, merges = 0, returns = 0 } = {}) {
         nearbyCount = nearby;
         discoveries.update(nearbyCount);
+        audio.setGathering(gatherSources.size > 0, nearbyCount);
         $("#gather-count").textContent = nearby ? `${nearby} drops in the current` : 'Draw the glass closer';
         $("#cycle-reading").textContent = `${merges} joined · ${returns} returned`;
         if (Number.isFinite(dropCount))
@@ -338,6 +339,7 @@ function setGather(source, value) {
   else gatherSources.delete(source);
   const active = gatherSources.size > 0;
   renderer?.setGathering(active);
+  audio.setGathering(active, nearbyCount);
   discoveries.setGathering(active);
   gather.setAttribute("aria-pressed", String(active));
   gallery.dataset.gathering = String(active);
@@ -569,6 +571,7 @@ function resetInput() {
   keys.clear();
   gatherSources.clear();
   renderer?.setGathering(false);
+  audio.setGathering(false);
   discoveries.resetInput();
   gather.setAttribute("aria-pressed", "false");
   gallery.dataset.gathering = 'false';
