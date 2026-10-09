@@ -17,6 +17,7 @@
   const fullName = name.textContent;
   let typingTimer = 0;
   let readingBounds = null;
+  const edgeLight = { x: 35, y: 15 };
   // Approved export: septuagint-depth-strata.json (2026-09-29).
   const chosenBackground = Object.freeze({ mode: 1, tilt: 15, depth: 31, shine: 48 });
   const camera = { x: 0.35, y: -0.18 };
@@ -127,7 +128,7 @@
   scene.dataset.depthPreset = "strata";
   function paintBackground(ctx, width, height) {
     prepareParticles(width, height);
-    background.paint(ctx, width, height, { ...chosenBackground, dark, composition: 1 }, camera);
+    background.paint(ctx, width, height, { ...chosenBackground, dark, composition: 1, focus: readingBounds }, camera);
     const color = dark ? "219,212,249" : "88,79,124";
     for (let i = 0; i < particles.length; i++) {
       const particle = particles[i];
@@ -197,6 +198,18 @@
     if (Math.abs(lens.strength) > 0) renderer.request();
     if (now - lastFrame >= 1000 / 30) {
       const ease = 1 - Math.exp(-seconds / 0.09);
+      if (readingBounds) {
+        const targetX = pointer.x === null ? 35 : Math.max(0, Math.min(100,
+          (pointer.x - readingBounds.left) / (readingBounds.right - readingBounds.left) * 100));
+        const targetY = pointer.y === null ? 15 : Math.max(0, Math.min(100,
+          (pointer.y - readingBounds.top) / (readingBounds.bottom - readingBounds.top) * 100));
+        if (Math.abs(edgeLight.x - targetX) + Math.abs(edgeLight.y - targetY) > .08) {
+          edgeLight.x += (targetX - edgeLight.x) * ease;
+          edgeLight.y += (targetY - edgeLight.y) * ease;
+          card.style.setProperty('--edge-x', `${edgeLight.x.toFixed(2)}%`);
+          card.style.setProperty('--edge-y', `${edgeLight.y.toFixed(2)}%`);
+        }
+      }
       camera.x += (cameraTarget.x - camera.x) * ease;
       camera.y += (cameraTarget.y - camera.y) * ease;
       if (Math.hypot(cameraTarget.x - camera.x, cameraTarget.y - camera.y) < 0.001) {
@@ -359,6 +372,9 @@
     finishTyping();
     if (reducedMotion.matches) {
       clearPointer();
+      edgeLight.x = 35; edgeLight.y = 15;
+      card.style.removeProperty('--edge-x');
+      card.style.removeProperty('--edge-y');
       lens.strength = 0;
       cancelAnimationFrame(interactionFrame);
       interactionFrame = 0;

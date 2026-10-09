@@ -7,6 +7,7 @@
     varying vec2 v_uv;
     uniform sampler2D u_art;
     uniform vec2 u_resolution, u_camera, u_viewport;
+    uniform vec4 u_focus;
     uniform float u_mode, u_depth, u_shine, u_dark, u_image, u_composition, u_portrait;
     mat3 rotY(float a){float c=cos(a),s=sin(a);return mat3(c,0.,-s,0.,1.,0.,s,0.,c);}
     mat3 rotX(float a){float c=cos(a),s=sin(a);return mat3(1.,0.,0.,0.,c,s,0.,-s,c);}
@@ -16,6 +17,14 @@
       vec3 color=mix(vec3(.70,.74,.82),vec3(.055,.072,.12),u_dark);
       float glow=exp(-length((uv-vec2(.44,.6))*vec2(1.,.85))*2.6);
       color+=mix(vec3(.13,.12,.13),vec3(.09,.075,.15),u_dark)*glow;
+      if(u_composition>.5){
+        // Soft, asymmetric illumination gives the approved strata a quieter
+        // setting. Only the homepage opts in; the material studies stay fixed.
+        vec2 cool=(uv-vec2(.18,.78))*vec2(1.,1.3);
+        vec2 warm=(uv-vec2(.85,.22))*vec2(1.2,1.);
+        color+=mix(vec3(.018,.035,.040),vec3(.016,.039,.068),u_dark)*exp(-dot(cool,cool)*6.);
+        color+=mix(vec3(.044,.020,.027),vec3(.045,.018,.056),u_dark)*exp(-dot(warm,warm)*7.);
+      }
       vec2 cells=uv*vec2(45.,32.);vec2 id=floor(cells),f=fract(cells)-.5;
       float stars=(1.-smoothstep(.015,.045,length(f)))*step(.91,hash(id));
       color+=mix(vec3(-.16),vec3(.33,.35,.45),u_dark)*stars;
@@ -126,10 +135,11 @@
         vec2 focus=(v_uv-vec2(.5,.51))*vec2(u_resolution.x/u_resolution.y*1.8,1.55);
         float calm=exp(-dot(focus,focus)*3.2);
         vec2 reading=(v_uv-vec2(.5,.51))*u_viewport/vec2(min(230.,u_viewport.x*.46),min(325.,u_viewport.y*.46));
+        if(u_focus.z>0.)reading=(vec2(v_uv.x,1.-v_uv.y)*u_viewport-u_focus.xy)/u_focus.zw;
         float readingEdge=pow(pow(abs(reading.x),4.)+pow(abs(reading.y),4.),.25);
         float darkCalm=1.-smoothstep(.85,1.7,readingEdge);
         vec3 tone=mix(vec3(.43,.48,.59),vec3(.075,.105,.18),u_dark);
-        color=mix(color,tone,mix(calm*.12,darkCalm*.42,u_dark));
+        color=mix(color,tone,mix(calm*.09,darkCalm*.50,u_dark));
       }
       float vignette=smoothstep(.3,1.35,length(v_uv-.5));
       gl_FragColor=vec4(color*(1.-vignette*.16),1.);
@@ -160,7 +170,7 @@
         const buffer = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]), gl.STATIC_DRAW);
         const position = gl.getAttribLocation(program, "a_position"); gl.enableVertexAttribArray(position); gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
-        uniforms = Object.fromEntries(["art","resolution","camera","viewport","mode","depth","shine","dark","image","composition","portrait"].map(name => [name,gl.getUniformLocation(program,`u_${name}`)]));
+        uniforms = Object.fromEntries(["art","resolution","camera","viewport","focus","mode","depth","shine","dark","image","composition","portrait"].map(name => [name,gl.getUniformLocation(program,`u_${name}`)]));
         texture = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,texture);
         gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
@@ -176,8 +186,9 @@
     function paintBackground(ctx, width, height) {
       const composition = state.composition === 1 ? 1 : 0;
       const portrait = composition && width < 700 && height > width ? 1 : 0;
+      const focus = state.focus;
       if (backgroundReady && !backgroundFailed && !contextLost) {
-        const key = [width,height,window.devicePixelRatio,state.mode,state.tilt,state.depth,state.shine,state.dark,composition,portrait,camera.x,camera.y,imageReady].join('/');
+        const key = [width,height,window.devicePixelRatio,state.mode,state.tilt,state.depth,state.shine,state.dark,composition,portrait,camera.x,camera.y,imageReady,focus?.left,focus?.top,focus?.right,focus?.bottom].join('/');
         if (key === sceneKey) { ctx.drawImage(backgroundCanvas,0,0,width,height); return; }
         sceneKey = key;
         const ratio = Math.min(1.4, window.devicePixelRatio || 1, Math.sqrt(1200000/(width*height)));
@@ -186,6 +197,8 @@
         gl.viewport(0,0,w,h); gl.useProgram(program); gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,texture);
         gl.uniform1i(uniforms.art,0);gl.uniform2f(uniforms.resolution,w,h);
         gl.uniform2f(uniforms.viewport,width,height);
+        gl.uniform4f(uniforms.focus, focus ? (focus.left+focus.right)*.5 : 0, focus ? (focus.top+focus.bottom)*.5 : 0,
+          focus ? Math.max(1,(focus.right-focus.left)*.5) : 0, focus ? Math.max(1,(focus.bottom-focus.top)*.5) : 0);
         const radians=state.tilt*Math.PI/180;
         gl.uniform2f(uniforms.camera,camera.x*radians,camera.y*radians);
         gl.uniform1f(uniforms.mode,state.mode);gl.uniform1f(uniforms.depth,state.depth);
