@@ -19,6 +19,13 @@ const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const mobile = matchMedia("(max-width: 760px), (pointer: coarse)");
 const keys = new Set(),
   gatherSources = new Set();
+const readings = Object.fromEntries([
+  'target-distance', 'aim-hud', 'gather-count', 'cycle-reading', 'drop-count',
+].map(id => [id, document.getElementById(id)]));
+function updateReading(id, text) {
+  const element = readings[id];
+  if (element.textContent !== text) element.textContent = text;
+}
 let renderer, announceTimeout, loadingTimeout;
 let keyboardFrame = 0,
   previousFrame = 0,
@@ -126,8 +133,9 @@ let lastTargetMobile = mobile.matches;
 function setTarget(next) {
   const distance = Number.isFinite(next?.distance) ? `${next.distance.toFixed(1)} m` : '';
   const reading = next?.kind ? `${next.assisted ? 'LINKED' : 'IN REACH'} / ${distance}` : '';
-  if ($("#target-distance").textContent !== reading) $("#target-distance").textContent = reading;
-  $("#aim-hud").classList.toggle("is-assisted", Boolean(next?.assisted));
+  updateReading('target-distance', reading);
+  if (Boolean(next?.assisted) !== Boolean(target?.assisted))
+    readings['aim-hud'].classList.toggle("is-assisted", Boolean(next?.assisted));
   const key = next?.kind ? `${next.kind}:${next.id}` : null;
   const previousKey = target?.kind ? `${target.kind}:${target.id}` : null;
   const unchanged =
@@ -208,11 +216,11 @@ function initialize() {
         nearbyCount = nearby;
         discoveries.update(nearbyCount);
         audio.setGathering(gatherSources.size > 0, nearbyCount);
-        $("#gather-count").textContent = nearby ? `${nearby} drops in the current` : 'Draw the glass closer';
-        $("#cycle-reading").textContent = `${merges} joined · ${returns} returned`;
+        updateReading('gather-count', nearby ? `${nearby} drops in the current` : 'Draw the glass closer');
+        updateReading('cycle-reading', `${merges} joined · ${returns} returned`);
         if (Number.isFinite(dropCount))
-          $("#drop-count").textContent = String(dropCount);
-        if (Number.isFinite(volumeRatio))
+          updateReading('drop-count', String(dropCount));
+        if (Number.isFinite(volumeRatio) && gallery.dataset.volumeRatio !== volumeRatio.toFixed(6))
           gallery.dataset.volumeRatio = volumeRatio.toFixed(6);
       },
       onTarget: setTarget,

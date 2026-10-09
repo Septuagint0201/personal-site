@@ -4,6 +4,8 @@
  * this is a material study, not the path tracer used by the next chapter.
  */
 
+import { createFramePacer } from './frame-pacing.js';
+
 const VERTEX = `
 attribute vec2 position;
 varying vec2 uv;
@@ -275,6 +277,7 @@ export function createMenuGlass({
   let slowFrames = 0;
   let timeOrigin = performance.now();
   let hiddenAt = document.hidden ? timeOrigin : 0;
+  const pacer = createFramePacer(30);
   const entries = [];
   const cleanups = [];
   const pointer = { x: 0.25, y: 0.22 };
@@ -317,14 +320,35 @@ export function createMenuGlass({
   for (const item of surfaces)
     add(item.canvas, item.element || item.canvas, true);
 
-  function draw(entry, now) {
-    if (entry.lost) return;
-    const { canvas, gl, uniforms, element, isSurface } = entry;
+  function measure(entry) {
+    if (entry.lost) return null;
+    const { element, isSurface } = entry;
+    if (element.style.visibility === 'hidden') return null;
     const rect = element.getBoundingClientRect();
-    const width = isSurface ? element.clientWidth : innerWidth;
-    const height = isSurface ? element.clientHeight : innerHeight;
+    if (!entry.layout) {
+      const styles = isSurface ? getComputedStyle(element) : null;
+      entry.layout = {
+        width: isSurface ? element.clientWidth : innerWidth,
+        height: isSurface ? element.clientHeight : innerHeight,
+        borderRadius: styles ? parseFloat(styles.borderTopLeftRadius) || 28 : 0,
+      };
+    }
+    const { width, height, borderRadius } = entry.layout;
     if (width < 2 || height < 2 || rect.bottom < 0 || rect.top > innerHeight)
-      return;
+      return null;
+    return {
+      rect, width, height, borderRadius,
+      // menu.js writes these inline on every spring update; reading them does
+      // not require resolving the card's complete computed style again.
+      tx: isSurface ? parseFloat(element.style.getPropertyValue("--ry")) || 0 : 0,
+      ty: isSurface ? parseFloat(element.style.getPropertyValue("--rx")) || 0 : 0,
+    };
+  }
+
+  function draw(entry, measured, now) {
+    if (!measured) return;
+    const { canvas, gl, uniforms, element, isSurface } = entry;
+    const { rect, width, height, tx, ty, borderRadius } = measured;
     const ratio =
       Math.min(devicePixelRatio || 1, isSurface ? 1.3 : 1.1) * quality;
     const areaScale = Math.min(
@@ -339,12 +363,6 @@ export function createMenuGlass({
       canvas.width = pixelWidth;
       canvas.height = pixelHeight;
     }
-    const styles = isSurface ? getComputedStyle(element) : null;
-    const tx = styles ? parseFloat(styles.getPropertyValue("--ry")) || 0 : 0;
-    const ty = styles ? parseFloat(styles.getPropertyValue("--rx")) || 0 : 0;
-    const borderRadius = styles
-      ? parseFloat(styles.borderTopLeftRadius) || 28
-      : 0;
     const warm =
       element.dataset?.accent === "mint"
         ? 2
@@ -374,10 +392,12 @@ export function createMenuGlass({
     frame = 0;
     if (disposed || document.hidden) return;
     const elapsed = now - lastDraw;
-    if (forced || elapsed >= 1000 / 30) {
+    if (pacer.ready(now, forced)) {
       forced = false;
       const started = performance.now();
-      for (const entry of entries) draw(entry, now);
+      // Finish layout/style reads before any canvas resize invalidates layout.
+      const measurements = entries.map(measure);
+      entries.forEach((entry, i) => draw(entry, measurements[i], now));
       onRender();
       const spent = performance.now() - started;
       // Adapt after sustained pressure; avoid changing resolution on every frame.
@@ -408,6 +428,7 @@ export function createMenuGlass({
   }
 
   function visibility() {
+    pacer.reset();
     if (document.hidden) {
       hiddenAt = performance.now();
       cancelAnimationFrame(frame);
@@ -419,12 +440,16 @@ export function createMenuGlass({
     }
   }
 
+  function resize() {
+    entries.forEach(entry => { entry.layout = null; });
+    invalidate();
+  }
   const observer =
     typeof ResizeObserver === "function"
-      ? new ResizeObserver(invalidate)
+      ? new ResizeObserver(resize)
       : null;
   if (observer) for (const entry of entries) observer.observe(entry.element);
-  addEventListener("resize", invalidate, { passive: true });
+  addEventListener("resize", resize, { passive: true });
   addEventListener("scroll", invalidate, { passive: true });
   addEventListener("pointermove", move, { passive: true });
   document.addEventListener("visibilitychange", visibility);
@@ -445,7 +470,7 @@ export function createMenuGlass({
       disposed = true;
       cancelAnimationFrame(frame);
       observer?.disconnect();
-      removeEventListener("resize", invalidate);
+      removeEventListener("resize", resize);
       removeEventListener("scroll", invalidate);
       removeEventListener("pointermove", move);
       document.removeEventListener("visibilitychange", visibility);

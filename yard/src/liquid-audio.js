@@ -17,7 +17,7 @@ export function liquidSoundPosition(position, listener) {
 /** Also accepts OfflineAudioContext for auditions using the actual instrument. */
 export function createLiquidSoundscape(context, { random = Math.random } = {}) {
   const voices = new Set(), nodes = [], lastEvents = new Map();
-  let disposed = false, gatherVoices = [], lastAmbient = -Infinity;
+  let disposed = false, gatherVoices = [], gatherDensity = -1, lastAmbient = -Infinity;
   const node = (value) => { nodes.push(value); return value; };
   const bus = node(context.createGain());
   const master = node(context.createGain());
@@ -157,13 +157,17 @@ export function createLiquidSoundscape(context, { random = Math.random } = {}) {
         entry.source.stop(at + 0.32);
       }
       gatherVoices = [];
+      gatherDensity = -1;
       return;
     }
     if (!gatherVoices.length) {
+      gatherDensity = -1;
       gatherVoices = [110, 165.2].map((frequency, i) => voice({ frequency, level: 0.018,
         sustained: true, attack: 0.25, at, pan: i ? 0.35 : -0.35 })).filter(Boolean);
     }
     const density = clamp(count / 6, 0, 1);
+    if (density === gatherDensity) return;
+    gatherDensity = density;
     gatherVoices.forEach((entry, i) => {
       entry.envelope.gain.setTargetAtTime(0.018 + density * 0.025, at, 0.22);
       entry.source.frequency.setTargetAtTime((i ? 165.2 : 110) * (1 + density * 0.025), at, 0.3);

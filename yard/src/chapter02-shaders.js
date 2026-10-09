@@ -435,7 +435,11 @@ vec3 toYCoCg(vec3 c){return vec3(dot(c,vec3(.25,.5,.25)),c.r*.5-c.b*.5,c.g*.5-(c
 vec3 fromYCoCg(vec3 c){return vec3(c.x+c.y-c.z,c.x+c.z,c.x-c.y-c.z);}
 void main(){
  vec2 uv=gl_FragCoord.xy/resolution,px=1./resolution;
- vec4 current=texture(image,uv),previous=texture(previousImage,uv);
+ vec4 current=texture(image,uv);
+ // Camera movement/resizing discards history. The neighbourhood cannot affect
+ // a zero-weight blend, so avoid its ten extra texture reads altogether.
+ if(historyWeight<=0.){outColor=current;return;}
+ vec4 previous=texture(previousImage,uv);
  vec3 lo=toYCoCg(current.rgb),hi=lo,mean=vec3(0.),moment=vec3(0.);
  float loMaterial=current.a,hiMaterial=current.a;
  for(int y=-1;y<=1;y++){
@@ -506,11 +510,16 @@ void main(){
  vec3 d=display(texture(image,uv-px).rgb),e=display(texture(image,uv+vec2(1.,-1.)*px).rgb),luma=vec3(.299,.587,.114);
  float lm=dot(c,luma),la=dot(a,luma),lb=dot(b,luma),ld=dot(d,luma),le=dot(e,luma);
  float lo=min(lm,min(min(la,lb),min(ld,le))),hi=max(lm,max(max(la,lb),max(ld,le)));
- vec2 direction=vec2(-((la+lb)-(ld+le)),(la+ld)-(lb+le));
- direction=clamp(direction/(min(abs(direction.x),abs(direction.y))+max((la+lb+ld+le)*.03125,.0078)),vec2(-7.),vec2(7.))*px;
- vec3 aa=.5*(texture(image,uv-direction/6.).rgb+texture(image,uv+direction/6.).rgb);
- vec3 bb=aa*.5+.25*(texture(image,uv-direction*.5).rgb+texture(image,uv+direction*.5).rgb);
- float l=dot(display(bb),luma);vec3 filtered=hi-lo<.07?raw:((l<lo||l>hi)?aa:bb);
+ vec3 filtered=raw;
+ // The existing contrast threshold already chooses the unfiltered centre on
+ // smooth pixels. Only compute the four directional FXAA taps at actual edges.
+ if(hi-lo>=.07){
+  vec2 direction=vec2(-((la+lb)-(ld+le)),(la+ld)-(lb+le));
+  direction=clamp(direction/(min(abs(direction.x),abs(direction.y))+max((la+lb+ld+le)*.03125,.0078)),vec2(-7.),vec2(7.))*px;
+  vec3 aa=.5*(texture(image,uv-direction/6.).rgb+texture(image,uv+direction/6.).rgb);
+  vec3 bb=aa*.5+.25*(texture(image,uv-direction*.5).rgb+texture(image,uv+direction*.5).rgb);
+  float l=dot(display(bb),luma);filtered=(l<lo||l>hi)?aa:bb;
+ }
  vec3 final=display(filtered+bloom);
  float vignette=1.-.12*pow(length((uv-.5)*vec2(1.,.8)),1.7);
  outColor=vec4(final*vignette,1.);

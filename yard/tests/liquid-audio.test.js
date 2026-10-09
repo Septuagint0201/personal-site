@@ -130,7 +130,7 @@ function audioContext() {
   const parameter = () => ({ value: 0,
     setValueAtTime(value) { this.value = value; },
     linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {},
-    setTargetAtTime() {}, cancelAndHoldAtTime() {},
+    setTargetAtTime() { this.targets = (this.targets || 0) + 1; }, cancelAndHoldAtTime() {},
   });
   const node = () => {
     const value = { connections: [], connect(other) { this.connections.push(other); return other; },
@@ -196,4 +196,17 @@ test("Gather density updates do not allocate more sources and release finishes a
   room.dispose();
   assert.ok(t.sources.every(source => Number.isFinite(source.stopTime)));
   assert.equal(room.play({ type: "pulse" }), false);
+});
+
+test("an unchanged Gather density does not accumulate audio automation events", () => {
+  const t = audioContext(), room = createLiquidSoundscape(t.context);
+  for (let i = 0; i < 1000; i++) room.setGathering(true, 3);
+  assert.ok(t.sources.every(source => source.frequency.targets === 1));
+  room.setGathering(true, 6);
+  assert.ok(t.sources.every(source => source.frequency.targets === 2));
+  room.setGathering(false);
+  t.tick(1);
+  room.setGathering(true, 6);
+  assert.ok(t.sources.slice(-2).every(source => source.frequency.targets === 1));
+  room.dispose();
 });

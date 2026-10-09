@@ -11,6 +11,7 @@ import { AREA_LIGHTS, METAL_SEGMENTS } from "./liquid-room.js";
 import { moveWalkingCamera } from "./liquid-camera.js";
 import { findLiquidTarget } from "./liquid-targeting.js";
 import { writeEllipsoidTransform, packCapsuleGroups } from "./liquid-optics.js";
+import { createFramePacer } from "./frame-pacing.js";
 
 const subtract = (a, b) => a.map((x, i) => x - b[i]);
 const dot = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
@@ -77,6 +78,7 @@ export function createLiquidRenderer(
   });
   if (!gl) throw new Error("WebGL 2 is unavailable.");
   const maximumTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+  const pacer = createFramePacer(60);
   let parallel, floatTarget;
   const motion = matchMedia("(prefers-reduced-motion: reduce)");
   const mobile = matchMedia("(pointer: coarse)").matches || innerWidth <= 760;
@@ -269,6 +271,7 @@ export function createLiquidRenderer(
     resize();
   }
   function prepare() {
+    if (ready) return true;
     if (
       performance.now() - compilationStarted > 90000 &&
       (!trace.ready || !room.ready || !temporal.ready || !bloom.ready || !resolve.ready)
@@ -561,7 +564,8 @@ export function createLiquidRenderer(
       onError?.(error, false);
       return;
     }
-    if (previous && now - previous < 15.4) {
+    if (!previous) pacer.reset();
+    if (!pacer.ready(now)) {
       invalidate();
       return;
     }

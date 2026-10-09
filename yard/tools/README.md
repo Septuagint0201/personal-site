@@ -11,6 +11,7 @@ Choose Entrance, Close glass or Side wall. Query options:
 - `?time=1` advances the deterministic scene for 60 frames before freezing it.
 - `?view=close` or `?view=side` starts directly at that view.
 - `?effect=resonance`, `?effect=constellation` or `?effect=afterimage` exercises a discovery's optical path without modifying saved discoveries.
+- `?flow` keeps the simulation running throughout measurement, retaining temporal history instead of invalidating it on every frame. Compare this mode only with the same mode and pre-roll in the reference version.
 - Combine options with `&`, for example `?baseline&quality=high`.
 
 Create the reference copy before changing production code, or extract a known revision. For the latest comparison, run this PowerShell from `yard/`:
@@ -18,7 +19,7 @@ Create the reference copy before changing production code, or extract a known re
 ```powershell
 New-Item -ItemType Directory -Force tools/.baseline
 $referenceArchive = Join-Path ([IO.Path]::GetTempPath()) ('yard-reference-' + [guid]::NewGuid() + '.tar')
-git archive --format=tar "--output=$referenceArchive" 683246ab0519a1c14a5e01d897fc7b427db3f76b:yard/src
+git archive --format=tar "--output=$referenceArchive" c1e86101aa3304f9c55cc2c413d92ab8c20072da:yard/src
 tar -xf $referenceArchive -C tools/.baseline
 Remove-Item -LiteralPath $referenceArchive
 ```
@@ -26,6 +27,8 @@ Remove-Item -LiteralPath $referenceArchive
 Run both versions with the same fixture, viewport, quality and simulation time, sequentially in one browser/GPU session. Synthetic 60 Hz animation timestamps make simulation pre-roll deterministic. Each measured frame invalidates temporal history with a zero-angle look update, so this measures active tracing rather than paused convergence or display frame rate. It also means the exported image is a single jittered frame with spatial AA, not a fully accumulated still. For pixel comparisons, use the same navigation sequence and sample phase for both versions.
 
 After `body.dataset.status` becomes `done`, `window.benchResult` contains the timings and `window.benchImage` contains the native render-buffer PNG captured after the final resolve. These are development fixture exports only; the public page exposes neither. Disjoint GPU measurements are discarded; inspect the reported complete-frame count before comparing. Do not run another GPU workload in parallel.
+
+`submissionMs` is the median JavaScript duration of the complete renderer callback. With GPU timers it measures CPU submission, not GPU completion. In the no-timer fallback it also includes the explicit synchronization, so the two modes are not comparable.
 
 ## Recorded comparison
 
@@ -80,3 +83,21 @@ Reference: `683246a`, including the previous optimization and pointer-lock fix. 
 Repeat comparisons retained 9.5% for Constellation and 8.8% for Afterimage, including reversed run order for the latter. Smaller gains are close to timing variation; the discovery paths are the clearest improvement. The narrow High run uses the desktop GPU and does not measure phone hardware or end-to-end FPS.
 
 All six non-trail snapshots were pixel-identical. Constellation changed 850 pixels and Afterimage 501 of 2,433,600, leaving at least 99.965% unchanged; mean absolute channel error was 0.00096 and 0.00090 on the 0–255 scale. These snapshots are limited coverage, not a proof for every view. Resolution, spectral transport, ray depth, AA, bloom, materials and geometry remain unchanged. A separate static-frame uniform-buffer experiment was discarded because its roughly 1% gain did not justify the additional buffer and lifecycle code.
+
+## Frame scheduling and interface overhead — 2026-10-09
+
+Reference: `c1e8610`. Sequential comparisons use the same browser/GPU session, 96 complete GPU frames per view, Ultra at 2080 × 1170 and a narrow High check at 390 × 844. The retained changes target scheduling and redundant work; they do not reduce optical quality.
+
+| Check | Reference | Updated | Scope |
+| --- | ---: | ---: | --- |
+| 60 Hz draw budget on simulated 144 Hz callbacks | 48 draws/s | 60 draws/s | Scheduler test; actual GPU-limited FPS can be lower |
+| Menu card computed-style queries over 120 animation callbacks | 48 | 0 | Settled desktop view; resize remeasures the cards |
+| Chapter 01 stage attribute mutations over 120 callbacks | 960 | 15 | Diagnostics are sampled at 5 Hz; selection and view mode remain immediate |
+| Ultra final resolve pass | 0.083 ms | 0.070 ms | Repeated across entrance, side, close and discovery views |
+| High temporal pass with discarded history | 0.010 ms | 0.006 ms | Same desktop GPU with a narrow viewport, not a phone measurement |
+
+The complete optical pipeline remained within session variation, so these results do **not** establish an overall GPU FPS gain. Representative paired totals were 11.28/11.29 ms at the entrance, 15.15/15.17 ms at close glass, and 20.72/20.68 ms with moving glass and active temporal history. Afterimage varied between runs; reversing the order gave 19.63/19.31 ms. Broader metal groups and precomputed light/trail values were tested and discarded because whole-frame gains were not stable.
+
+Five of eight final RGB8 comparisons were pixel-identical: entrance, side wall, Constellation, Afterimage and High. Close glass changed 691 pixels, Resonance 532, and the flowing snapshot three of 2,433,600 pixels; mean absolute channel error was at most 0.00078 on a 0–255 scale. The moving snapshot differed by at most one level. Sparse boundary differences in the other two views remain within the previous compiler/rounding comparison scale. No transport code, scene geometry, optical depth, quality preset or sampling threshold changed.
+
+Browser checks also cover card resizing from 390 to 1280 CSS pixels, coordinate navigation after pointer preview, Chapter 01 selection/Pulse/Pause and visible mobile actions, Chapter 02 mobile Gather/release and sound toggle, and WebGL context loss/restoration. Public assets already use gzip and cache headers; no server configuration change was needed.

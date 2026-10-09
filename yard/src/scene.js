@@ -598,6 +598,7 @@ export function createPlayground(stage, { onHit, onHold, onSceneChange, onFrame,
     onError?.('The graphics connection was interrupted. Reload to return to the gallery.');
   });
 
+  let telemetryAt = -Infinity;
   function render(now) {
     raf = 0;
     if (disposed || failed || document.hidden) return;
@@ -677,18 +678,25 @@ export function createPlayground(stage, { onHit, onHold, onSceneChange, onFrame,
     cameraTarget.set(Math.sin(view.yaw) * Math.cos(view.pitch), Math.sin(view.pitch), -Math.cos(view.yaw) * Math.cos(view.pitch)).add(camera.position);
     camera.lookAt(cameraTarget);
     const lookingAround = Math.cos(view.yaw) < 0.75;
-    stage.parentElement.classList.toggle('is-looking-around', lookingAround);
-    stage.dataset.view = lookingAround ? 'around' : 'arch';
-    stage.dataset.cameraMode = cameraRig.mode;
-    stage.dataset.cameraPosition = view.position.map(value => value.toFixed(4)).join(',');
-    stage.dataset.cameraYaw = view.yaw.toFixed(4);
-    stage.dataset.cameraPitch = view.pitch.toFixed(4);
-    stage.dataset.cameraFov = String(camera.fov);
-    stage.dataset.focusPosition = focus.map(value => value.toFixed(4)).join(',');
+    const viewLabel = lookingAround ? 'around' : 'arch';
+    if (stage.dataset.view !== viewLabel) {
+      stage.parentElement.classList.toggle('is-looking-around', lookingAround);
+      stage.dataset.view = viewLabel;
+    }
+    if (stage.dataset.cameraMode !== cameraRig.mode) stage.dataset.cameraMode = cameraRig.mode;
+    // Diagnostics do not need a DOM mutation for every rendered frame.
+    if (now - telemetryAt >= 200) {
+      stage.dataset.cameraPosition = view.position.map(value => value.toFixed(4)).join(',');
+      stage.dataset.cameraYaw = view.yaw.toFixed(4);
+      stage.dataset.cameraPitch = view.pitch.toFixed(4);
+      stage.dataset.cameraFov = String(camera.fov);
+      stage.dataset.focusPosition = focus.map(value => value.toFixed(4)).join(',');
+      telemetryAt = now;
+    }
     renderer.render(scene, camera);
     glassArrows.render();
     onFrame?.(renderer.domElement);
-    stage.dataset.ready = 'true';
+    if (stage.dataset.ready !== 'true') stage.dataset.ready = 'true';
     // Sample actual frames once, and only trade resolution for latency when needed.
     if (!adaptationDone && moving && delta > 0 && time > 2) {
       frameSamples++; frameElapsed += delta;

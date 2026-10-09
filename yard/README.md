@@ -90,6 +90,10 @@ Shader preparation is asynchronous where supported. High uses up to 1.5 device p
 
 Rendering and audio suspend when the document is hidden. Reduced-motion preference starts in a static scene; manual camera/material changes and selection still work. Native controls and dialog support keyboard use. A renderer failure/context loss shows a recovery view; JavaScript-disabled browsers get a static explanation and a link to the personal site.
 
+Frame scheduling carries a 60 Hz deadline for Chapter 02 and a 30 Hz deadline for the menu background across display refreshes. This avoids accidentally reducing the draw budget to 48 Hz on a 144 Hz display; it does not guarantee 60 fps on a GPU-bound device. User-driven menu updates still draw immediately, and paused/hidden views reset their deadline. Glass-card dimensions and corner radii are cached until resize; live bounds and inline tilt still follow the orbit on every draw. Chapter 01 diagnostics update at 5 Hz, and Chapter 02 readings only change their text when values change. Repeated Gather density readings do not schedule duplicate audio automation.
+
+The optical transport remains unchanged. Temporal resolve bypasses neighbourhood filtering only when history has already been discarded, and FXAA fetches its four directional samples only above the existing contrast threshold. Spectral channels, ray depth, geometry, target resolution, AA thresholds and bloom settings are retained. See [measured scope and limitations](tools/README.md#frame-scheduling-and-interface-overhead--2026-10-09).
+
 ## Server deployment
 
 - SSH alias: `septuagint-vm1`
