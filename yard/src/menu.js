@@ -1,6 +1,7 @@
 import { chapters } from "./chapters.js";
 import { createMenuGlass } from "./menu-glass.js";
 import { createRingNavigator } from "./ring-navigation.js";
+import { createRingScroll } from "./ring-scroll.js";
 import { createGlassArrows } from "./glass-arrows.js";
 import { createViewportRingGeometry } from "./menu-orbit-geometry.js";
 import "./interaction.css";
@@ -43,6 +44,11 @@ rail.innerHTML = chapters
   )
   .join("");
 const cards = [...stack.children];
+const cardParts = cards.map(card => ({
+  details: card.querySelector('.card-details'),
+  select: card.querySelector('.side-select'),
+  direction: card.querySelector('.side-direction'),
+}));
 const thumbs = [...rail.querySelectorAll("button")];
 const glassArrows = createGlassArrows({
   source: () => document.querySelector("#glass-world"),
@@ -69,7 +75,7 @@ let previousTime = 0;
 let start = null;
 let focusedSide = 0;
 let entryHovered = false;
-let geometry;
+let geometry, stackBounds, animating = false, paintDirty = true, wheelPreviewSuppressed = false;
 const navigator = createRingNavigator({
   count: chapters.length,
   initial: 0,
@@ -78,6 +84,10 @@ const navigator = createRingNavigator({
   damping: 18.5,
   reducedMotion: motion.matches,
   onChange: () => updateSelection(),
+});
+const wheelInput = createRingScroll({
+  navigator, count: chapters.length, viewportHeight: () => innerHeight,
+  reducedMotion: motion.matches,
 });
 document.querySelector("#page-total").textContent = String(
   chapters.length,
@@ -100,11 +110,13 @@ function measure() {
   stage.dataset.orbitDiameter = (geometry.radius * 2).toFixed(1);
   stage.dataset.neighbourExposure = "0.66";
   stage.dataset.edgeExposure = "0.90";
+  stackBounds = stack.getBoundingClientRect();
   applyPreview();
   invalidate();
 }
 function applyPreview() {
   if (!geometry) return;
+  if (wheelPreviewSuppressed) { navigator.setPreview(0); return; }
   const y = focusedSide || pointer.y;
   const edge = clamp(Math.abs(y), 0, 1);
   const progressive = edge * edge * (3 - 2 * edge);
@@ -117,10 +129,10 @@ function updateSelection(announce = true) {
   cards.forEach((card, i) => {
     const active = i === selected;
     card.classList.toggle("is-active", active);
-    const details = card.querySelector(".card-details");
+    const details = cardParts[i].details;
     details.inert = !active;
     details.setAttribute("aria-hidden", String(!active));
-    const button = card.querySelector(".side-select");
+    const button = cardParts[i].select;
     button.hidden = active;
     button.inert = active;
     thumbs[i].setAttribute("aria-current", String(active));
@@ -149,8 +161,12 @@ function paint() {
     card.style.transform = `translate3d(${tilt.x * 3}px,${y}px,${z}px) rotateX(${pitch}deg) rotateY(${tilt.x * 2.2}deg)`;
     card.style.zIndex = String(1000 + Math.round(z));
     card.style.visibility = front ? "visible" : "hidden";
-    card.dataset.side = active ? "front" : direction < 0 ? "above" : "below";
-    card.dataset.direction = String(direction);
+    const side = active ? "front" : direction < 0 ? "above" : "below";
+    if (card.dataset.side !== side) card.dataset.side = side;
+    if (card.dataset.direction !== String(direction)) {
+      card.dataset.direction = String(direction);
+      cardParts[i].direction.textContent = direction < 0 ? "PREVIOUS CHAPTER" : "NEXT CHAPTER";
+    }
     card.dataset.orbitAngle = angle.toFixed(4);
     card.style.setProperty("--rx", pitch);
     card.style.setProperty("--ry", tilt.x * 2.2);
@@ -158,50 +174,71 @@ function paint() {
     card.style.setProperty("--ty", `${tilt.y * 3}px`);
     card.style.setProperty("--shine-x", `${50 + pointer.x * 38}%`);
     card.style.setProperty("--shine-y", `${50 + pointer.y * 38}%`);
-    card.querySelector(".side-direction").textContent =
-      direction < 0 ? "PREVIOUS CHAPTER" : "NEXT CHAPTER";
   });
   glass.invalidate();
 }
 function animate(now) {
   frame = 0;
   if (document.hidden) return;
+  animating = true;
   const dt = Math.min((now - previousTime) / 1000 || 0.016, 0.032);
   previousTime = now;
-  const moving = !entryHovered && navigator.update(dt);
+  const oldRotation = navigator.rotation, oldX = tilt.x, oldY = tilt.y;
+  const scrolling = wheelInput.update(now);
+  const moving = (!entryHovered || scrolling) && navigator.update(dt);
   const blend = motion.matches ? 1 : 1 - Math.exp(-9 * dt);
   if (!entryHovered) {
     tilt.x += ((motion.matches ? 0 : pointer.x) - tilt.x) * blend;
     tilt.y += ((motion.matches ? 0 : pointer.y) - tilt.y) * blend;
   }
-  paint();
+  if (paintDirty || navigator.rotation !== oldRotation || tilt.x !== oldX || tilt.y !== oldY) {
+    paint();
+    paintDirty = false;
+  }
+  animating = false;
   if (
-    moving ||
+    wheelInput.waiting || moving ||
     (!entryHovered &&
       !motion.matches &&
       Math.abs(tilt.x - pointer.x) + Math.abs(tilt.y - pointer.y) > 0.002)
   )
     frame = requestAnimationFrame(animate);
 }
-function invalidate() {
-  if (!frame && !document.hidden) {
+function invalidate(dirty = true) {
+  paintDirty ||= dirty;
+  if (!frame && !animating && !document.hidden) {
     previousTime = performance.now();
     frame = requestAnimationFrame(animate);
   }
 }
 function rest() {
+  const pointerId = start?.id;
+  start = null;
+  delete stage.dataset.dragging;
+  if (pointerId !== undefined && stage.hasPointerCapture(pointerId))
+    stage.releasePointerCapture(pointerId);
+  wheelInput.cancel();
+  navigator.snap();
+  wheelPreviewSuppressed = false;
   entryHovered = false;
   pointer.x = pointer.y = 0;
   applyPreview();
   invalidate();
 }
 function step(direction) {
+  cancelScroll();
   navigator.step(direction);
   applyPreview();
   invalidate();
 }
+function cancelScroll() {
+  wheelInput.cancel();
+  wheelPreviewSuppressed = false;
+  entryHovered = false;
+}
 thumbs.forEach((button, i) =>
   button.addEventListener("click", () => {
+    cancelScroll();
     navigator.select(i);
     invalidate();
   }),
@@ -236,6 +273,7 @@ window.addEventListener("keydown", (event) => {
   event.preventDefault();
   const fromThumb = !!document.activeElement?.closest(".thumbnail");
   const fromCard = !!document.activeElement?.closest(".chapter-card");
+  cancelScroll();
   if (direction) step(direction);
   else navigator.select(event.key === "Home" ? 0 : chapters.length - 1);
   if (fromThumb) thumbs[navigator.index].focus();
@@ -250,12 +288,14 @@ window.addEventListener("pointermove", (event) => {
     motion.matches
   )
     return;
+  if (wheelInput.active) return;
+  wheelPreviewSuppressed = false;
   entryHovered = !!event.target.closest(".enter-chapter");
   // Stop the physical spring while the live entry target is being clicked.
   if (entryHovered) return;
   if (event.target.closest("a,button") && !event.target.closest(".side-select"))
     return;
-  const bounds = stack.getBoundingClientRect();
+  const bounds = stackBounds;
   pointer.x = clamp(
     (event.clientX - bounds.left - bounds.width / 2) / (bounds.width / 2),
     -1,
@@ -281,57 +321,52 @@ stage.addEventListener("pointerdown", (event) => {
     id: event.pointerId,
     x: event.clientX,
     y: event.clientY,
-    type: event.pointerType,
+    axis: null,
   };
   stage.setPointerCapture(event.pointerId);
 });
+stage.addEventListener('pointermove', (event) => {
+  if (!start || start.id !== event.pointerId) return;
+  const dx = event.clientX - start.x, dy = event.clientY - start.y;
+  if (!start.axis) {
+    if (Math.hypot(dx, dy) < 8) return;
+    start.axis = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y';
+    entryHovered = false;
+    wheelPreviewSuppressed = true;
+    stage.dataset.dragging = 'true';
+    wheelInput.beginDrag();
+  }
+  const distance = start.axis === 'x' ? -dx : -dy;
+  const span = start.axis === 'x' ? Math.max(180, stackBounds.width * .65) : undefined;
+  wheelInput.drag(distance, span);
+  invalidate();
+});
 stage.addEventListener("pointerup", (event) => {
   if (!start || event.pointerId !== start.id) return;
-  const dx = event.clientX - start.x,
-    dy = event.clientY - start.y,
-    type = start.type;
+  const dragged = Boolean(start.axis);
   start = null;
+  delete stage.dataset.dragging;
+  if (dragged) { wheelInput.endDrag(); invalidate(); }
   if (stage.hasPointerCapture(event.pointerId))
     stage.releasePointerCapture(event.pointerId);
-  if (type !== "touch" && Math.abs(dy) > 45 && Math.abs(dy) > Math.abs(dx))
-    step(dy < 0 ? 1 : -1);
-  else if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.25)
-    step(dx < 0 ? 1 : -1);
 });
 stage.addEventListener("pointercancel", () => {
   start = null;
   rest();
 });
 stage.addEventListener("lostpointercapture", () => {
+  if (start) rest();
   start = null;
 });
-let wheelTotal = 0,
-  wheelTime = 0,
-  wheelLockedUntil = 0;
 window.addEventListener(
   "wheel",
   (event) => {
-    if (
-      event.ctrlKey ||
-      Math.max(Math.abs(event.deltaY), Math.abs(event.deltaX)) < 1
-    )
-      return;
+    if (!wheelInput.wheel(event, performance.now())) return;
     event.preventDefault();
-    const now = performance.now();
-    if (now < wheelLockedUntil) return;
-    if (now - wheelTime > 180) wheelTotal = 0;
-    wheelTime = now;
-    const unit =
-      event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? innerHeight : 1;
-    wheelTotal +=
-      (Math.abs(event.deltaY) >= Math.abs(event.deltaX)
-        ? event.deltaY
-        : event.deltaX) * unit;
-    if (Math.abs(wheelTotal) > 42) {
-      step(wheelTotal > 0 ? 1 : -1);
-      wheelTotal = 0;
-      wheelLockedUntil = now + 650;
-    }
+    entryHovered = false;
+    wheelPreviewSuppressed = true;
+    navigator.setPreview(0);
+    invalidate(!motion.matches);
   },
   { passive: false },
 );
@@ -346,6 +381,7 @@ window.addEventListener("blur", () => {
 });
 window.addEventListener("resize", measure, { passive: true });
 motion.addEventListener("change", () => {
+  wheelInput.setReducedMotion(motion.matches);
   navigator.setReducedMotion(motion.matches);
   glass.setReducedMotion(motion.matches);
   glassArrows.setReducedMotion(motion.matches);

@@ -35,9 +35,19 @@ export function createRingNavigator({
     velocity = 0,
     preview = 0;
   let still = Boolean(reducedMotion);
+  function station(i = index) {
+    return positions[i] + Math.round((target - positions[i]) / TAU) * TAU;
+  }
+  function snap() {
+    target = station();
+    preview = 0;
+    if (still) { rotation = target; velocity = 0; }
+    return index;
+  }
   function changed(next, direction, distance) {
+    const origin = station();
     index = next;
-    target += distance;
+    target = origin + distance;
     preview = 0;
     if (still) {
       rotation = target;
@@ -70,19 +80,37 @@ export function createRingNavigator({
     },
     select(next) {
       next = modulo(Math.round(next), count);
-      if (next === index) return index;
+      if (next === index) return snap();
       const distance = wrap(positions[next] - positions[index]);
       return changed(next, Math.sign(distance), distance);
     },
+    // Continuous input retains an unwrapped target through the end of the ring.
+    // Existing buttons/keys still move between exact stations, even mid-scroll.
+    seek(value) {
+      if (!Number.isFinite(value)) return index;
+      const direction = Math.sign(value - target);
+      target = value;
+      preview = 0;
+      let nearest = index, distance = Infinity;
+      positions.forEach((_, i) => {
+        const gap = Math.abs(station(i) - target);
+        if (gap < distance) { nearest = i; distance = gap; }
+      });
+      if (nearest !== index) {
+        index = nearest;
+        onChange?.(index, direction);
+      }
+      if (still) snap();
+      return index;
+    },
+    snap,
     setPreview(value) {
       preview = still ? 0 : Math.max(-1, Math.min(1, value)) * previewAngle;
     },
     setReducedMotion(value) {
       still = Boolean(value);
       if (still) {
-        preview = 0;
-        rotation = target;
-        velocity = 0;
+        snap();
       }
     },
     update(delta) {

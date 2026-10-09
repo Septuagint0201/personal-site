@@ -1281,6 +1281,12 @@ main {
 .chapter-card.is-active .card-details {
   pointer-events: none;
 }
+.chapter-card.is-active .card-surface {
+  cursor: grab;
+}
+.card-stage[data-dragging="true"] .card-surface {
+  cursor: grabbing;
+}
 .chapter-card.is-active .enter-chapter {
   pointer-events: auto;
   position: relative;
