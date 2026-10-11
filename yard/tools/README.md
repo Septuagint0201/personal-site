@@ -1,4 +1,16 @@
-# Chapter 02 GPU comparison
+# YARD rendering performance fixtures
+
+## Chapter 03 CPU comparison
+
+From `yard/`, run `node tools/benchmark-desert.mjs`. To compare a preserved source copy, use `node tools/benchmark-desert.mjs --baseline=tools/.baseline/desert-sand-20261012`. The optional reference directory must contain `desert-skin.js` and `sand-field.js`; keep reference copies in the ignored `.baseline/` directory before modifying them.
+
+The fixture measures seven warmed batches of skin interpolation and height sampling. It compares all output vertices across sixteen deformed poses, five softness values and a hover scale, retaining the same 1,600/6,400 triangle densities. These are CPU kernel timings, not whole-frame or GPU/FPS results.
+
+On the local 2026-10-12 comparison, the 6,400-triangle interpolation went from about 0.33–0.43 ms to 0.058–0.068 ms per call (about 82–84% less CPU time); sampled Float32 vertex positions and height samples matched exactly. Absolute times depend on the host. Resolution, MSAA, transmission resolution, dispersion, physical lattice and particle budgets were retained. Static sand detail now uses 1,024px albedo/normal maps, and changed terrain normals use direct grid reads. Paused/settled bodies skip geometry rebuilding; live grain buffers upload only their used prefix.
+
+The contact/corner follow-up can be compared with `node tools/benchmark-desert.mjs --baseline=tools/.baseline/desert-contact-20261012 --surface`. It retains the prior skin optimization. Reusing row/column trigonometry reduced the local 1,024px texture bake from approximately 126 ms to 96 ms, with identical texture bytes. Direct scalar volume gradients reduced that kernel from approximately 1.92 µs to 0.84 µs, with identical scalar/gradient outputs. These kernel savings do not measure the cost of the new surface-contact queries. Contact groups are refreshed only while grains are active; paused particle attributes no longer upload, and live particle color/size buffers change only with pool membership.
+
+## Chapter 02 GPU fixture
 
 Run `npm run dev` from `yard/`, then open `/tools/render-benchmark.html`. This fixture is excluded from the explicit Vite production page list. It uses the actual renderer and `EXT_disjoint_timer_query_webgl2` to measure its eight HDR passes. Allow shader preparation to finish before judging performance.
 

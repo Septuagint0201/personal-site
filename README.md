@@ -7,7 +7,7 @@ I'm glad you stopped by. I hope you find something interesting here that brings 
 本仓库同时维护两个网站：
 
 - 根目录：Candy 个人主页，部署于 https://candy-spt.com/ 。
-- [`yard/`](yard/README.md)：YARD 章节目录、第一章玻璃光学展厅和第二章液态玻璃展厅，独立构建并部署于 https://yard.septuagint21.org/ 。
+- [`yard/`](yard/README.md)：YARD 章节目录、第一章玻璃光学展厅、第二章液态玻璃展厅和第三章沙漠软玻璃实验，独立构建并部署于 https://yard.septuagint21.org/ 。
 
 YARD 使用站点根路径；在 `yard/` 内运行，不直接作为 Candy 的 `/yard/` 子路径发布：
 

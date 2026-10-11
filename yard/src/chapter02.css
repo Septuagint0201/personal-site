@@ -545,7 +545,7 @@ button {
   gap: 7px;
   padding-right: 9px;
 }
-.quality-control > span {
+.quality-control > label {
   font-size: 6px;
   letter-spacing: 0.19em;
   color: #a4b9c9;
@@ -971,7 +971,7 @@ button {
     align-items: center;
     gap: 8px;
   }
-  .quality-control > span {
+  .quality-control > label {
     display: none;
   }
   .gallery-intro h1 {

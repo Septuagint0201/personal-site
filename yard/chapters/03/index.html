@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#d8ba8e" />
+    <meta name="description" content="A suspended crystal, soft glass, and a desert that remembers your touch. Chapter 03 of YARD." />
+    <title>Chapter 03 — What the sand remembers · YARD</title>
+  </head>
+  <body>
+    <main class="desert-study" id="desert-study">
+      <div id="desert-stage"></div>
+      <div class="edge-shade" aria-hidden="true"></div>
+      <header class="study-header">
+        <a class="wordmark" href="/" aria-label="YARD — All chapters"><span aria-hidden="true">✦</span> YARD <small>/ All chapters</small></a>
+        <button id="notes-open" class="quiet-button" type="button">Field notes <span aria-hidden="true">↗</span></button>
+      </header>
+      <section class="introduction" aria-labelledby="study-title">
+        <p class="eyebrow">03 / THE DESERT STUDY</p>
+        <h1 id="study-title">What the sand<br /><em>remembers.</em></h1>
+        <p class="intro-copy">A little gravity.<br />A lasting trace.</p>
+        <div class="state-reading">
+          <span class="state-dot" aria-hidden="true"></span><span id="phase-name">SUSPENDED</span>
+          <span class="tether-meter" aria-hidden="true"><i id="tether-fill"></i></span>
+        </div>
+        <p class="state-hint" id="state-hint">A gentle push returns.<br />A little further, and it lets go.</p>
+      </section>
+      <aside class="desert-note" aria-label="Desert atmosphere"><span class="eyebrow">A QUIET SIGNAL</span><span>Light above. Memory below.</span></aside>
+      <div class="gesture-hint" id="gesture-hint">Drag the crystal beyond its halo · Trace the sand</div>
+      <section class="study-controls" aria-label="Desert interactions">
+        <button type="button" id="push"><span aria-hidden="true">↗</span> Push</button>
+        <button type="button" id="squeeze" aria-pressed="false" disabled><span aria-hidden="true">↔</span> Hold to squeeze</button>
+        <span class="control-divider" aria-hidden="true"></span>
+        <button type="button" id="smooth">Smooth sand</button>
+        <button type="button" id="restart">Start again</button>
+        <button type="button" id="pause" aria-pressed="false">Pause</button>
+      </section>
+      <footer class="study-footer">
+        <span>GLASS / SAND / SOFT GRAVITY</span>
+        <div class="quality-label"><label for="quality">OPTICS</label><select id="quality" aria-label="Optical quality"><option value="ultra">Ultra</option><option value="high">High</option></select></div>
+      </footer>
+      <p class="announcement" id="announcement" role="status" aria-live="polite"></p>
+      <div class="loading" id="loading"><span class="loading-mark" aria-hidden="true">◇</span><p>Every grain holds a little light.</p></div>
+      <section id="fallback" class="fallback" hidden><h2>A moment in the shade.</h2><p id="fallback-message">This study needs WebGL 2 and graphics acceleration.</p><button id="retry" type="button">Try again</button><a href="/">All chapters ↗</a></section>
+      <noscript><div class="fallback"><h2>What the sand remembers.</h2><p>Enable JavaScript to explore this interactive desert.</p><a href="/">All chapters ↗</a></div></noscript>
+    </main>
+    <dialog id="notes" aria-labelledby="notes-title">
+      <form method="dialog"><button class="close-notes" aria-label="Close notes">×</button></form>
+      <p class="eyebrow">FIELD NOTES / CHAPTER 03</p>
+      <h2 id="notes-title">Nothing to hold<br /><em>it here.</em></h2>
+      <div class="note-grid">
+        <article><span>01</span><h3>A fragile tether</h3><p>Click to send a small impulse. Near its starting place, the crystal finds its way home. Pull it beyond the blue halo and the tether breaks.</p></article>
+        <article><span>02</span><h3>Something softer</h3><p>The released glass softens, keeping the memory of its three-sided shape. Drag its surface to stretch or press it into the ground. Right-drag downward, or hold Squeeze, to flatten it. The further you pull, the more it resists. Let go and it gently finds its shape again. Loose grains can rest on the glass, then slide away. If it comes to rest beyond the frame, the desert drops it back from above.</p></article>
+        <article><span>03</span><h3>A surface with memory</h3><p>Trace a shallow trail and watch loose grains skip across the sand. The glass pushes ridges out around its impressions; steep edges settle and compressed tracks look smoother. Smooth sand clears only the ground. Start again begins a new experiment.</p></article>
+      </div>
+      <p class="notes-footnote">The camera stays fixed. P pushes, Space pauses, and R starts again. Interacting resumes the study. On touch screens, drag with one finger and use Hold to squeeze after release.</p>
+    </dialog>
+    <script type="module" src="/src/chapter03.js"></script>
+  </body>
+</html>

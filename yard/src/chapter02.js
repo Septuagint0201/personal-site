@@ -2,6 +2,8 @@ import { createLiquidRenderer } from "./chapter02-renderer.js";
 import { createLiquidAudio } from "./liquid-audio.js";
 import { createLiquidDiscoveries } from "./liquid-discoveries.js";
 import { createLiquidPointerLock } from "./liquid-pointer-lock.js";
+import { createGlassSelect } from "./glass-select.js";
+import "./glass-select.css";
 
 const $ = (selector) => document.querySelector(selector);
 const canvas = $("#liquid-canvas"),
@@ -256,6 +258,7 @@ quality.addEventListener("change", () => {
   gallery.dataset.quality = quality.value;
   announce(`${quality.value === "ultra" ? "Ultra" : "High"} optical quality`);
 });
+const qualityMenu = createGlassSelect(quality, { theme: 'night', onOpen: () => { pointerLock?.release(); resetInput(); } });
 motion.addEventListener("click", () => {
   if (!renderer) return;
   renderer.setPaused(!renderer.state.paused);
@@ -525,7 +528,7 @@ function startKeyboardLook() {
 function keyboardIsEditing(event) {
   return (
     event.target instanceof Element &&
-    (event.target.closest("input,select,textarea,[contenteditable=true]") ||
+    (event.target.closest('input,select,textarea,[contenteditable=true],[role="combobox"],[role="listbox"]') ||
       ((event.code === "Space" || event.code === "Enter") &&
         event.target.closest("button,a")))
   );
@@ -614,6 +617,7 @@ window.addEventListener("pagehide", (event) => {
   clearTimeout(feedbackTimer);
   if (!event.persisted) {
     disposed = true;
+    qualityMenu.dispose();
     pointerLock.dispose();
     renderer?.dispose();
     audio.dispose();
