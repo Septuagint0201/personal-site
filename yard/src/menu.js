@@ -75,6 +75,7 @@ let previousTime = 0;
 let start = null;
 let focusedSide = 0;
 let entryHovered = false;
+let navigationSettling = false, suppressDragClick = false;
 let geometry, stackBounds, animating = false, paintDirty = true, wheelPreviewSuppressed = false;
 const navigator = createRingNavigator({
   count: chapters.length,
@@ -185,7 +186,10 @@ function animate(now) {
   previousTime = now;
   const oldRotation = navigator.rotation, oldX = tilt.x, oldY = tilt.y;
   const scrolling = wheelInput.update(now);
-  const moving = (!entryHovered || scrolling) && navigator.update(dt);
+  // Input can end before its spring reaches the selected station. Entry hover
+  // only holds pointer preview still; it must not strand a navigation mid-orbit.
+  const moving = (!entryHovered || scrolling || navigationSettling) && navigator.update(dt);
+  if (!scrolling && !moving) navigationSettling = false;
   const blend = motion.matches ? 1 : 1 - Math.exp(-9 * dt);
   if (!entryHovered) {
     tilt.x += ((motion.matches ? 0 : pointer.x) - tilt.x) * blend;
@@ -213,12 +217,14 @@ function invalidate(dirty = true) {
 }
 function rest() {
   const pointerId = start?.id;
+  suppressDragClick ||= Boolean(start?.axis);
   start = null;
   delete stage.dataset.dragging;
   if (pointerId !== undefined && stage.hasPointerCapture(pointerId))
     stage.releasePointerCapture(pointerId);
   wheelInput.cancel();
   navigator.snap();
+  navigationSettling = true;
   wheelPreviewSuppressed = false;
   entryHovered = false;
   pointer.x = pointer.y = 0;
@@ -233,8 +239,10 @@ function step(direction) {
 }
 function cancelScroll() {
   wheelInput.cancel();
-  wheelPreviewSuppressed = false;
+  navigationSettling = true;
+  wheelPreviewSuppressed = true;
   entryHovered = false;
+  navigator.setPreview(0);
 }
 thumbs.forEach((button, i) =>
   button.addEventListener("click", () => {
@@ -288,10 +296,10 @@ window.addEventListener("pointermove", (event) => {
     motion.matches
   )
     return;
-  if (wheelInput.active) return;
-  wheelPreviewSuppressed = false;
   entryHovered = !!event.target.closest(".enter-chapter");
-  // Stop the physical spring while the live entry target is being clicked.
+  if (wheelInput.active || navigationSettling) return;
+  wheelPreviewSuppressed = false;
+  // Keep a settled entry stable while it is being clicked.
   if (entryHovered) return;
   if (event.target.closest("a,button") && !event.target.closest(".side-select"))
     return;
@@ -310,11 +318,18 @@ window.addEventListener("pointermove", (event) => {
   invalidate();
 });
 window.addEventListener("pointerleave", rest);
-stage.addEventListener("pointerdown", (event) => {
+window.addEventListener("pointerdown", (event) => {
+  // A second finger yields to native pinch zoom rather than steering the ring.
+  if (event.pointerType === "touch" && !event.isPrimary) {
+    if (start) rest();
+    return;
+  }
+  suppressDragClick = false;
   if (
     event.button !== 0 ||
     !event.isPrimary ||
-    event.target.closest("a,button")
+    (event.pointerType !== "touch" &&
+      (!stage.contains(event.target) || event.target.closest("a,button")))
   )
     return;
   start = {
@@ -323,17 +338,22 @@ stage.addEventListener("pointerdown", (event) => {
     y: event.clientY,
     axis: null,
   };
-  stage.setPointerCapture(event.pointerId);
+  // Leave taps on links/buttons untouched. Capture only after a real swipe.
 });
-stage.addEventListener('pointermove', (event) => {
+window.addEventListener("dragstart", (event) => {
+  if (start) event.preventDefault();
+});
+window.addEventListener('pointermove', (event) => {
   if (!start || start.id !== event.pointerId) return;
   const dx = event.clientX - start.x, dy = event.clientY - start.y;
   if (!start.axis) {
     if (Math.hypot(dx, dy) < 8) return;
     start.axis = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y';
     entryHovered = false;
+    navigationSettling = true;
     wheelPreviewSuppressed = true;
     stage.dataset.dragging = 'true';
+    stage.setPointerCapture(event.pointerId);
     wheelInput.beginDrag();
   }
   const distance = start.axis === 'x' ? -dx : -dy;
@@ -341,29 +361,41 @@ stage.addEventListener('pointermove', (event) => {
   wheelInput.drag(distance, span);
   invalidate();
 });
-stage.addEventListener("pointerup", (event) => {
+window.addEventListener("pointerup", (event) => {
   if (!start || event.pointerId !== start.id) return;
   const dragged = Boolean(start.axis);
   start = null;
   delete stage.dataset.dragging;
-  if (dragged) { wheelInput.endDrag(); invalidate(); }
+  if (dragged) {
+    suppressDragClick = true;
+    navigationSettling = true;
+    wheelInput.endDrag();
+    invalidate();
+  }
   if (stage.hasPointerCapture(event.pointerId))
     stage.releasePointerCapture(event.pointerId);
 });
-stage.addEventListener("pointercancel", () => {
-  start = null;
-  rest();
+window.addEventListener("pointercancel", (event) => {
+  if (start?.id === event.pointerId) rest();
 });
-stage.addEventListener("lostpointercapture", () => {
-  if (start) rest();
-  start = null;
+stage.addEventListener("lostpointercapture", (event) => {
+  // Transferring implicit touch capture from a child to the stage is expected.
+  if (start?.id === event.pointerId && !stage.hasPointerCapture(event.pointerId)) rest();
 });
+window.addEventListener("click", (event) => {
+  if (!suppressDragClick || event.detail === 0) return;
+  suppressDragClick = false;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+}, true);
+document.documentElement.classList.add("orbit-input-ready");
 window.addEventListener(
   "wheel",
   (event) => {
     if (!wheelInput.wheel(event, performance.now())) return;
     event.preventDefault();
     entryHovered = false;
+    navigationSettling = true;
     wheelPreviewSuppressed = true;
     navigator.setPreview(0);
     invalidate(!motion.matches);
@@ -376,7 +408,6 @@ document.addEventListener("visibilitychange", () => {
   rest();
 });
 window.addEventListener("blur", () => {
-  start = null;
   rest();
 });
 window.addEventListener("resize", measure, { passive: true });

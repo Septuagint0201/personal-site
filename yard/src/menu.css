@@ -15,6 +15,11 @@ body {
   min-height: 100svh;
   overflow-x: hidden;
 }
+html.orbit-input-ready,
+.orbit-input-ready body {
+  /* Full-screen one-finger orbit gestures, with native two-finger zoom. */
+  touch-action: pinch-zoom;
+}
 a {
   color: inherit;
   text-decoration: none;
@@ -1259,7 +1264,7 @@ main {
   border-radius: 0;
   isolation: isolate;
   overflow: clip;
-  touch-action: none;
+  touch-action: pinch-zoom;
   pointer-events: none;
   z-index: 2;
   perspective-origin: calc((100% + var(--card-left) - var(--card-right)) / 2)
