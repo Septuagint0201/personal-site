@@ -74,6 +74,24 @@ body {
   width: 100%;
   height: 100%;
 }
+.glass-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.glass-presentation {
+  display: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: -2;
+}
+.glass-active .glass-presentation { display: block; }
+.no-webgl .glass-backdrop { display: none; }
 .no-webgl #glass-canvas {
   display: none;
 }

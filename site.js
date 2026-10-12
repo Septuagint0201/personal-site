@@ -80,6 +80,8 @@
   // Keep DOM reads outside the particle loop, including on short scrolling screens.
   function updateReadingBounds() {
     const bounds = card.getBoundingClientRect();
+    if (readingBounds && readingBounds.left === bounds.left - 12 && readingBounds.right === bounds.right + 12
+      && readingBounds.top === bounds.top - 12 && readingBounds.bottom === bounds.bottom + 12) return;
     readingBounds = {
       left: bounds.left - 12,
       right: bounds.right + 12,
@@ -128,7 +130,7 @@
   scene.dataset.depthPreset = "strata";
   function paintBackground(ctx, width, height) {
     prepareParticles(width, height);
-    background.paint(ctx, width, height, { ...chosenBackground, dark, composition: 1, focus: readingBounds }, camera);
+    background.paint(ctx, width, height, { ...chosenBackground, dark, composition: 1, maxDpr: 2, focus: readingBounds }, camera);
     const color = dark ? "219,212,249" : "88,79,124";
     for (let i = 0; i < particles.length; i++) {
       const particle = particles[i];
@@ -263,8 +265,9 @@
   }
   if (window.LiquidGlass) {
     renderer = new window.LiquidGlass.Renderer(scene, {
-      maxDpr: 1.5,
-      maxPixels: 1800000,
+      attachSurfaces: true,
+      maxDpr: 2,
+      maxPixels: 2600000,
       paintBackground,
       getSurfaces: () => document.querySelectorAll(".glass-surface"),
       getSurfaceEffects: (surface) => ({
@@ -348,7 +351,10 @@
       button.style.setProperty("--shine-y", `${(event.clientY - bounds.top) / bounds.height * 100}%`);
     });
   });
-  window.addEventListener("scroll", updateReadingBounds, {
+  let scrollFrame = 0;
+  window.addEventListener("scroll", () => {
+    if (!scrollFrame) scrollFrame = requestAnimationFrame(() => { scrollFrame = 0; updateReadingBounds(); });
+  }, {
     passive: true,
   });
   window.addEventListener("resize", () => {

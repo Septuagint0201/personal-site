@@ -1,3 +1,12 @@
+/* Dragging is the primary interaction throughout YARD. */
+:where(body, body *) {
+  -webkit-user-select: none;
+  user-select: none;
+}
+:where(input:not([type="range"]), textarea, [contenteditable="true"]) {
+  -webkit-user-select: text;
+  user-select: text;
+}
 /* Independent scale composes with positioning/tilt transforms across all chapters. */
 a[href] {
   display: inline-flex;

@@ -64,11 +64,17 @@ export function createDesertScene(stage, { onStatus = () => {}, onDetach = () =>
     map: sandTextures.color, normalMap: sandTextures.normal, normalScale: new THREE.Vector2(.88, .88) });
   sandMaterial.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, groundUniforms);
-    shader.vertexShader = 'varying vec3 vSandWorld;\nattribute float sandCompression;\nvarying float vSandCompression;\n' + shader.vertexShader;
-    shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvSandWorld=(modelMatrix*vec4(position,1.)).xyz;vSandCompression=sandCompression;');
-    shader.fragmentShader = 'varying vec3 vSandWorld;\nvarying float vSandCompression;\nuniform vec3 sandBody;\nuniform vec4 sandHover;\nuniform float sandField,sandClock;\n' + shader.fragmentShader;
+    shader.vertexShader = 'varying vec3 vSandWorld;\nattribute float sandCompression,sandDisplacement;\nvarying float vSandCompression,vSandDisplacement;\n' + shader.vertexShader;
+    shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvSandWorld=(modelMatrix*vec4(position,1.)).xyz;vSandCompression=sandCompression;vSandDisplacement=sandDisplacement;');
+    shader.fragmentShader = 'varying vec3 vSandWorld;\nvarying float vSandCompression,vSandDisplacement;\nuniform vec3 sandBody;\nuniform vec4 sandHover;\nuniform float sandField,sandClock;\n' + shader.fragmentShader;
     shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       diffuseColor.rgb*=1.-vSandCompression*.105;
+      if(vSandDisplacement<-.025){
+        float cut=smoothstep(.025,.48,-vSandDisplacement);
+        float strata=.5+.5*sin(vSandDisplacement*48.+vSandWorld.x*.7+vSandWorld.z*.4);
+        diffuseColor.rgb*=1.-cut*(.10+strata*.035);
+      }
+      diffuseColor.rgb+=vec3(.025,.019,.009)*smoothstep(.015,.15,vSandDisplacement);
       vec2 shadowOffset=(vSandWorld.xz-sandBody.xz-vec2(.25,.15)*sandBody.y)/(.82+sandBody.y*.12);
       float shadow=exp(-dot(shadowOffset,shadowOffset)*1.6)*(.33/(1.+sandBody.y*.25));
       diffuseColor.rgb*=1.-shadow;
@@ -99,11 +105,13 @@ export function createDesertScene(stage, { onStatus = () => {}, onDetach = () =>
   groundGeometry.setAttribute('position', new THREE.BufferAttribute(groundPositions, 3).setUsage(THREE.DynamicDrawUsage));
   groundGeometry.setAttribute('normal', new THREE.BufferAttribute(groundNormals, 3).setUsage(THREE.DynamicDrawUsage));
   groundGeometry.setAttribute('sandCompression', new THREE.BufferAttribute(sand.compaction, 1).setUsage(THREE.DynamicDrawUsage));
+  groundGeometry.setAttribute('sandDisplacement', new THREE.BufferAttribute(sand.displacement, 1).setUsage(THREE.DynamicDrawUsage));
   groundGeometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); groundGeometry.setIndex(indices);
   const terrain = new THREE.Mesh(groundGeometry, sandMaterial); scene.add(terrain);
   const farGeometry = new THREE.PlaneGeometry(160, 160, 256, 256); farGeometry.rotateX(-Math.PI / 2);
   const farPosition = farGeometry.attributes.position, farUv = farGeometry.attributes.uv, farIndices = [];
   farGeometry.setAttribute('sandCompression', new THREE.BufferAttribute(new Float32Array(farPosition.count), 1));
+  farGeometry.setAttribute('sandDisplacement', new THREE.BufferAttribute(new Float32Array(farPosition.count), 1));
   for (let i = 0; i < farPosition.count; i++) {
     const x = farPosition.getX(i), z = farPosition.getZ(i);
     farPosition.setY(i, duneHeight(x, z)); farUv.setXY(i, x * sandTextures.uvScale, z * sandTextures.uvScale);
@@ -141,10 +149,12 @@ export function createDesertScene(stage, { onStatus = () => {}, onDetach = () =>
       attribute.addUpdateRange((z0 * sand.stride + x0) * 3, ((z1 - z0) * sand.stride + x1 - x0 + 1) * 3);
       attribute.needsUpdate = true;
     }
-    const compression = groundGeometry.attributes.sandCompression;
-    compression.clearUpdateRanges();
-    compression.addUpdateRange(z0 * sand.stride + x0, (z1 - z0) * sand.stride + x1 - x0 + 1);
-    compression.needsUpdate = true;
+    for (const name of ['sandCompression', 'sandDisplacement']) {
+      const attribute = groundGeometry.attributes[name];
+      attribute.clearUpdateRanges();
+      attribute.addUpdateRange(z0 * sand.stride + x0, (z1 - z0) * sand.stride + x1 - x0 + 1);
+      attribute.needsUpdate = true;
+    }
     grains.syncSurface(full ? null : { x0, x1, z0, z1 });
     groundGeometry.boundingSphere.radius = Math.sqrt(sand.size * sand.size / 2 + groundHeightExtent * groundHeightExtent);
   }
@@ -297,7 +307,7 @@ export function createDesertScene(stage, { onStatus = () => {}, onDetach = () =>
     const steps = Math.max(1, Math.ceil(distance / .09));
     for (let i = 1; i <= steps; i++) {
       const p = lastSand ? scratch.copy(lastSand).lerp(point, i / steps) : point;
-      sand.stamp(p.x, p.z, .32, .14, flowX, flowZ, .7 + Math.min(1.2, distance));
+      sand.stamp(p.x, p.z, .42, .23, flowX, flowZ, .7 + Math.min(1.2, distance), press?.sandLayer);
     }
     lastSand = point.clone();
   }
@@ -317,7 +327,8 @@ export function createDesertScene(stage, { onStatus = () => {}, onDetach = () =>
     if (!hit && !ground) return;
     wake();
     press = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false,
-      kind: hit ? (event.button === 2 && physics.phase === 'released' ? 'squeeze' : 'body') : 'sand' };
+      kind: hit ? (event.button === 2 && physics.phase === 'released' ? 'squeeze' : 'body') : 'sand',
+      sandLayer: ground ? sand.displacement.slice() : null };
     canvas.setPointerCapture(event.pointerId); canvas.classList.add('is-dragging');
     if (hit) {
       camera.getWorldDirection(cameraDirection); pointerPlane.setFromNormalAndCoplanarPoint(cameraDirection, hit.point);

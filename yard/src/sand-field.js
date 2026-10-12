@@ -31,15 +31,21 @@ export function createSandField({ size = 20, resolution = 160, onDisplace = () =
     return ((base[a] + displacement[a]) * (1 - fx) + (base[a + 1] + displacement[a + 1]) * fx) * (1 - fz)
       + ((base[a + stride] + displacement[a + stride]) * (1 - fx) + (base[a + stride + 1] + displacement[a + stride + 1]) * fx) * fz;
   }
-  function stamp(cx, cz, radius = .3, depth = .12, flowX = 0, flowZ = 0, energy = 1) {
+  function stamp(cx, cz, radius = .3, depth = .12, flowX = 0, flowZ = 0, energy = 1, stroke = null) {
     if (![cx, cz, radius, depth].every(Number.isFinite) || radius <= 0 || depth <= 0) return false;
     radius = Math.max(radius, spacing * 1.5);
-    if (Math.max(Math.abs(cx), Math.abs(cz)) + radius * 1.65 >= size / 2) return false;
-    depth = Math.min(depth, .34);
-    const x0 = Math.max(0, Math.floor((cx - radius * 1.65 + size / 2) / spacing));
-    const x1 = Math.min(resolution, Math.ceil((cx + radius * 1.65 + size / 2) / spacing));
-    const z0 = Math.max(0, Math.floor((cz - radius * 1.65 + size / 2) / spacing));
-    const z1 = Math.min(resolution, Math.ceil((cz + radius * 1.65 + size / 2) / spacing));
+    const layered = stroke?.length === displacement.length;
+    if (layered) {
+      const center = clamp(Math.round((cz + size / 2) / spacing), 0, resolution) * stride
+        + clamp(Math.round((cx + size / 2) / spacing), 0, resolution);
+      radius += Math.max(0, -stroke[center]) * .55;
+    }
+    if (Math.max(Math.abs(cx), Math.abs(cz)) + radius * 1.95 >= size / 2) return false;
+    depth = Math.min(depth, .48);
+    const x0 = Math.max(0, Math.floor((cx - radius * 1.95 + size / 2) / spacing));
+    const x1 = Math.min(resolution, Math.ceil((cx + radius * 1.95 + size / 2) / spacing));
+    const z0 = Math.max(0, Math.floor((cz - radius * 1.95 + size / 2) / spacing));
+    const z1 = Math.min(resolution, Math.ceil((cz + radius * 1.95 + size / 2) / spacing));
     let removed = 0, rimWeight = 0, rimCount = 0;
     flowX = Number.isFinite(flowX) ? flowX : 0; flowZ = Number.isFinite(flowZ) ? flowZ : 0;
     const flowLength = Math.hypot(flowX, flowZ), flowScale = flowLength > 1e-8 ? .42 / flowLength : 0;
@@ -47,16 +53,22 @@ export function createSandField({ size = 20, resolution = 160, onDisplace = () =
       const dx = x * spacing - size / 2 - cx, dz = z * spacing - size / 2 - cz;
       const r = Math.hypot(dx, dz) / radius;
       const i = z * stride + x;
-      if (r < .8) {
-        const footprint = Math.exp(-r * r / .2);
-        const wanted = -depth * (1 - compaction[i] * .12) * footprint;
+      if (r < .95) {
+        // A deeper core and a broad shoulder leave multiple relief scales.
+        const taper = clamp((.95 - r) / .2, 0, 1);
+        const footprint = (.66 * Math.exp(-r * r / .15) + .34 * Math.exp(-r * r / .5)) * taper * taper * (3 - 2 * taper);
+        // One stroke has a fixed reference surface: event density cannot make
+        // it dig infinitely. A fresh pass can excavate the next layer.
+        const reference = layered ? Math.min(0, stroke[i]) : 0;
+        const wanted = Math.max(-.82, reference - depth * (1 - compaction[i] * .12) * footprint);
         if (displacement[i] > wanted) {
           removed += displacement[i] - wanted;
           displacement[i] = wanted;
-          compaction[i] = Math.max(compaction[i], Math.min(.92, depth * 3.5) * footprint);
+          compaction[i] = Math.max(compaction[i], Math.min(.96, -wanted * 3.5) * footprint);
         }
-      } else if (r < 1.65) {
-        const weight = Math.exp(-(((r - 1.12) / .23) ** 2)) * (1 + flowScale * (dx * flowX + dz * flowZ) / (radius * r));
+      } else if (r < 1.95) {
+        const weight = (.78 * Math.exp(-(((r - 1.12) / .20) ** 2)) + .22 * Math.exp(-(((r - 1.57) / .24) ** 2)))
+          * (1 + flowScale * (dx * flowX + dz * flowZ) / (radius * r));
         rimIds[rimCount] = i; rimWeights[rimCount++] = weight; rimWeight += weight;
       }
     }

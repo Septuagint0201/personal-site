@@ -30,7 +30,8 @@
 
     vec3 sampleScene(vec2 p) {
       vec2 uv = vec2(p.x / u_resolution.x, 1.0 - p.y / u_resolution.y);
-      return texture2D(u_texture, clamp(uv, vec2(0.001), vec2(0.999))).rgb;
+      vec2 halfTexel = 0.5 / (u_resolution * u_dpr);
+      return texture2D(u_texture, clamp(uv, halfTexel, 1.0 - halfTexel)).rgb;
     }
     float roundedBox(vec2 p, vec2 halfSize, float radius) {
       vec2 q = abs(p) - halfSize + radius;
@@ -69,12 +70,14 @@
       vec2 local = p - u_rect.xy - halfSize;
       float radius = min(u_radius, min(halfSize.x, halfSize.y));
       float dist = roundedBox(local, halfSize, radius);
-      if (dist > 1.0) { gl_FragColor = vec4(original, 1.0); return; }
-      vec2 gradient = vec2(
-        roundedBox(local + vec2(0.5, 0.0), halfSize, radius) - roundedBox(local - vec2(0.5, 0.0), halfSize, radius),
-        roundedBox(local + vec2(0.0, 0.5), halfSize, radius) - roundedBox(local - vec2(0.0, 0.5), halfSize, radius)
-      );
-      vec2 outward = gradient / max(length(gradient), 0.0001);
+      if (dist > 1.0 / u_dpr) { gl_FragColor = vec4(original, 1.0); return; }
+      // Exact rounded-box gradient avoids finite-difference corner shimmer.
+      vec2 q = abs(local) - halfSize + radius;
+      vec2 corner = max(q, 0.0);
+      float cornerLength = length(corner);
+      vec2 outward = cornerLength > 0.0001
+        ? sign(local) * corner / cornerLength
+        : (q.x > q.y ? vec2(sign(local.x), 0.0) : vec2(0.0, sign(local.y)));
       float bevel = min(9.0 + u_material.y * 0.32, min(halfSize.x, halfSize.y) * 0.7);
       float edge = 1.0 - clamp(-dist / max(bevel, 1.0), 0.0, 1.0);
       float slope = pow(edge, 1.7) * 2.8;
@@ -131,7 +134,8 @@
       float hotspot = exp(-dot(u_light - p, u_light - p) / 9500.0) * u_surface.y;
       color += vec3(1.0, 0.98, 0.95) * ((fresnel * 0.22 + sheen * 0.12 + rim * directional * 0.24) * u_surface.x + hotspot * (0.075 + rim * 0.18));
       color -= edge * (1.0 - directional) * 0.065;
-      float coverage = 1.0 - smoothstep(-0.7, 0.7, dist);
+      float aa = 0.75 / u_dpr;
+      float coverage = 1.0 - smoothstep(-aa, aa, dist);
       gl_FragColor = vec4(mix(original, color, coverage), 1.0);
     }
   `;
@@ -143,6 +147,17 @@
       this.canvas = options.canvas || element.querySelector("canvas");
       this.background = document.createElement("canvas");
       this.ctx = this.background.getContext("2d");
+      this.layers = new Map();
+      if (options.attachSurfaces) {
+        this.backdrop = document.createElement("canvas");
+        this.backdrop.className = "glass-backdrop";
+        this.backdrop.setAttribute("aria-hidden", "true");
+        element.append(this.backdrop);
+        this.backdropContext = this.backdrop.getContext("2d", { alpha: false });
+        this.extended = document.createElement("canvas");
+        this.extendedContext = this.extended.getContext("2d", { alpha: false });
+        this.canvas.hidden = true;
+      }
       this.width = 0;
       this.height = 0;
       this.frame = 0;
@@ -175,6 +190,9 @@
         });
         if (!gl) throw new Error("WebGL unavailable");
         this.gl = gl;
+        this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+        this.textureWidth = this.textureHeight = 0;
+        this.backdropKey = null;
         const compile = (type, source) => {
           const shader = gl.createShader(type);
           gl.shaderSource(shader, source);
@@ -269,6 +287,19 @@
       this.canvas.height = Math.round(height * dpr);
       this.background.width = this.canvas.width;
       this.background.height = this.canvas.height;
+      if (this.backdrop) {
+        this.backdrop.width = this.background.width;
+        this.backdrop.height = this.background.height;
+      }
+      this.targetWidth = this.targetHeight = 0;
+      this.attachedWidth = this.attachedHeight = 0;
+      if (!this.backdrop) this.allocateTargets();
+      this.refreshBackground();
+    }
+    allocateTargets() {
+      if (this.targetWidth === this.canvas.width && this.targetHeight === this.canvas.height) return;
+      this.targetWidth = this.canvas.width;
+      this.targetHeight = this.canvas.height;
       if (!this.failed) {
         const gl = this.gl;
         for (const target of this.targets) {
@@ -303,7 +334,6 @@
           }
         }
       }
-      this.refreshBackground();
     }
     refreshBackground() {
       if (!this.width) return;
@@ -315,18 +345,88 @@
         this.element.style.backgroundSize = "100% 100%";
         return;
       }
+      this.sourceDirty = true;
+      if (this.backdrop) { this.request(); return; }
+      this.uploadBackground(this.background);
+      this.request();
+    }
+    uploadBackground(source) {
       const gl = this.gl;
       gl.bindTexture(gl.TEXTURE_2D, this.sourceTexture);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-      gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        gl.RGBA,
-        gl.RGBA,
-        gl.UNSIGNED_BYTE,
-        this.background,
-      );
-      this.request();
+      if (this.textureWidth === source.width && this.textureHeight === source.height) {
+        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, source);
+      } else {
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+        this.textureWidth = source.width; this.textureHeight = source.height;
+      }
+      this.sourceVersion = (this.sourceVersion || 0) + 1;
+      this.sourceDirty = false;
+    }
+    prepareAttachedFrame(bounds, surfaces, material) {
+      const roots = surfaces.filter(item => !surfaces.some(parent => parent !== item && parent.surface.contains(item.surface)));
+      const margin = Math.ceil(material.thickness * 1.2 + material.roughness * 2 + 4);
+      const left = Math.floor(Math.min(0, ...roots.map(item => item.rect.left - bounds.left - margin)));
+      const top = Math.floor(Math.min(0, ...roots.map(item => item.rect.top - bounds.top - margin)));
+      const neededRight = Math.ceil(Math.max(this.width, ...roots.map(item => item.rect.right - bounds.left + margin)));
+      const neededBottom = Math.ceil(Math.max(this.height, ...roots.map(item => item.rect.bottom - bounds.top + margin)));
+      // Keep capacity through a scroll gesture. Only origin changes as the
+      // card crosses the viewport; no render-target allocation every frame.
+      const width = this.attachedWidth = Math.max(this.attachedWidth || 0, neededRight - left);
+      const height = this.attachedHeight = Math.max(this.attachedHeight || 0, neededBottom - top);
+      const right = left + width, bottom = top + height;
+      const limit = this.maxTextureSize;
+      const dpr = Math.min(window.devicePixelRatio || 1, this.options.maxDpr || 1.5,
+        Math.sqrt((this.options.maxPixels || 2400000) / (width * height)), limit / width, limit / height);
+      const pixelWidth = Math.max(1, Math.round(width * dpr)), pixelHeight = Math.max(1, Math.round(height * dpr));
+      const key = `${left}/${top}/${pixelWidth}/${pixelHeight}/${dpr}`;
+      if (this.canvas.width !== pixelWidth) this.canvas.width = pixelWidth;
+      if (this.canvas.height !== pixelHeight) this.canvas.height = pixelHeight;
+      this.allocateTargets();
+      if (this.sourceDirty || key !== this.sourceKey) {
+        if (this.extended.width !== pixelWidth) this.extended.width = pixelWidth;
+        if (this.extended.height !== pixelHeight) this.extended.height = pixelHeight;
+        const ctx = this.extendedContext, source = this.background;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        // Clamp-extend the scene beyond the viewport. Full root surfaces stay
+        // painted while native scrolling temporarily outruns JavaScript.
+        const columns = [[0, 1, 0, -left], [0, source.width, -left, this.width],
+          [source.width - 1, 1, this.width - left, right - this.width]];
+        const rows = [[0, 1, 0, -top], [0, source.height, -top, this.height],
+          [source.height - 1, 1, this.height - top, bottom - this.height]];
+        for (const [sx, sw, dx, dw] of columns) for (const [sy, sh, dy, dh] of rows)
+          if (dw > 0 && dh > 0) ctx.drawImage(source, sx, sy, sw, sh, dx, dy, dw, dh);
+        this.uploadBackground(this.extended);
+        this.sourceKey = key;
+      }
+      return { left: bounds.left + left, top: bounds.top + top, width, height, dpr, roots, sceneBounds: bounds };
+    }
+    presentAttachedFrame(view, sceneOnly = false) {
+      if (sceneOnly) {
+        const bounds = view.sceneBounds;
+        this.backdropContext.drawImage(this.canvas, (bounds.left - view.left) * view.dpr,
+          (bounds.top - view.top) * view.dpr, this.width * view.dpr, this.height * view.dpr,
+          0, 0, this.backdrop.width, this.backdrop.height);
+        return;
+      }
+      for (const { surface, rect } of view.roots) {
+        let layer = this.layers.get(surface);
+        if (!layer) {
+          const canvas = document.createElement('canvas');
+          canvas.className = 'glass-presentation'; canvas.setAttribute('aria-hidden', 'true');
+          surface.append(canvas);
+          layer = { canvas, ctx: canvas.getContext('2d') }; this.layers.set(surface, layer);
+        }
+        const width = Math.max(1, Math.round(rect.width * view.dpr)), height = Math.max(1, Math.round(rect.height * view.dpr));
+        if (layer.canvas.width !== width) layer.canvas.width = width;
+        if (layer.canvas.height !== height) layer.canvas.height = height;
+        layer.ctx.clearRect(0, 0, width, height);
+        layer.ctx.drawImage(this.canvas, (rect.left - view.left) * view.dpr, (rect.top - view.top) * view.dpr,
+          rect.width * view.dpr, rect.height * view.dpr, 0, 0, width, height);
+      }
+      for (const [surface, layer] of this.layers) if (!view.roots.some(item => item.surface === surface)) {
+        layer.canvas.remove(); this.layers.delete(surface);
+      }
     }
     request() {
       if (this.frame || this.failed || document.hidden) return;
@@ -341,6 +441,12 @@
         u = this.uniforms,
         state = this.options.getState(),
         m = state.material;
+      const bounds = this.element.getBoundingClientRect();
+      const surfaces = [...(this.options.getSurfaces?.() || this.element.querySelectorAll('.glass-surface'))]
+        .map(surface => ({ surface, rect: surface.getBoundingClientRect() }));
+      const view = this.backdrop ? this.prepareAttachedFrame(bounds, surfaces, m)
+        : { left: bounds.left, top: bounds.top, dpr: this.dpr };
+      if (this.failed) return;
       gl.useProgram(this.program);
       gl.viewport(0, 0, this.canvas.width, this.canvas.height);
       gl.activeTexture(gl.TEXTURE0);
@@ -348,10 +454,10 @@
       // Use exact buffer/CSS scaling to keep sampling aligned at fractional DPRs.
       gl.uniform2f(
         u.resolution,
-        this.canvas.width / this.dpr,
-        this.canvas.height / this.dpr,
+        this.canvas.width / view.dpr,
+        this.canvas.height / view.dpr,
       );
-      gl.uniform1f(u.dpr, this.dpr);
+      gl.uniform1f(u.dpr, view.dpr);
       gl.uniform1f(u.dark, state.dark ? 1 : 0);
       gl.uniform1f(u.invert, state.invertedTint ? 1 : 0);
       gl.uniform1f(
@@ -359,7 +465,7 @@
         { bevel: 0, rounded: 1, soft: 2 }[state.edgeProfile] ?? 2,
       );
       gl.uniform1f(u.enabled, state.refraction === false ? 0 : 1);
-      gl.uniform2f(u.light, ...this.light);
+      gl.uniform2f(u.light, this.light[0] + bounds.left - view.left, this.light[1] + bounds.top - view.top);
       const lens = state.lens;
       gl.uniform4f(u.lens, 0, 0, 1, 0);
       let input = this.sourceTexture;
@@ -370,21 +476,24 @@
         gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
         gl.bindTexture(gl.TEXTURE_2D, input);
         gl.uniform4f(u.rect, 0, 0, -1, 0);
-        gl.uniform4f(u.lens, lens.x, lens.y, lens.radius, lens.strength);
+        gl.uniform4f(u.lens, lens.x + bounds.left - view.left, lens.y + bounds.top - view.top, lens.radius, lens.strength);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
         input = target.texture;
         passOffset = 1;
         gl.uniform4f(u.lens, 0, 0, 1, 0);
       }
-      const bounds = this.element.getBoundingClientRect();
-      const surfaces = [
-        ...(this.options.getSurfaces?.() ||
-          this.element.querySelectorAll(".glass-surface")),
-      ];
+      const backdropKey = `${this.sourceVersion}/${lens?.x}/${lens?.y}/${lens?.radius}/${lens?.strength}`;
+      if (this.backdrop && this.backdropKey !== backdropKey) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.bindTexture(gl.TEXTURE_2D, input);
+        gl.uniform4f(u.rect, 0, 0, -1, 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        this.presentAttachedFrame(view, true);
+        this.backdropKey = backdropKey;
+      }
       // Ping-pong buffers ensure each button refracts the already-rendered parent glass.
-      surfaces.forEach((surface, index) => {
-        const rect = surface.getBoundingClientRect(),
-          nested =
+      surfaces.forEach(({ surface, rect }, index) => {
+        const nested =
             !!surface.parentElement.closest(".glass-surface") ||
             surface.hasAttribute("data-glass-compact");
         const target = this.targets[(index + passOffset) % 2];
@@ -392,8 +501,8 @@
         gl.bindTexture(gl.TEXTURE_2D, input);
         gl.uniform4f(
           u.rect,
-          rect.left - bounds.left,
-          rect.top - bounds.top,
+          rect.left - view.left,
+          rect.top - view.top,
           rect.width,
           rect.height,
         );
@@ -416,6 +525,7 @@
       gl.bindTexture(gl.TEXTURE_2D, input);
       gl.uniform4f(u.rect, 0, 0, -1, 0);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
+      if (this.backdrop) this.presentAttachedFrame(view);
       this.element.dataset.rendered = "true";
     }
   }

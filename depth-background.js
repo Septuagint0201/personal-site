@@ -188,10 +188,10 @@
       const portrait = composition && width < 700 && height > width ? 1 : 0;
       const focus = state.focus;
       if (backgroundReady && !backgroundFailed && !contextLost) {
-        const key = [width,height,window.devicePixelRatio,state.mode,state.tilt,state.depth,state.shine,state.dark,composition,portrait,camera.x,camera.y,imageReady,focus?.left,focus?.top,focus?.right,focus?.bottom].join('/');
+        const key = [width,height,window.devicePixelRatio,state.maxDpr,state.mode,state.tilt,state.depth,state.shine,state.dark,composition,portrait,camera.x,camera.y,imageReady,focus?.left,focus?.top,focus?.right,focus?.bottom].join('/');
         if (key === sceneKey) { ctx.drawImage(backgroundCanvas,0,0,width,height); return; }
         sceneKey = key;
-        const ratio = Math.min(1.4, window.devicePixelRatio || 1, Math.sqrt(1200000/(width*height)));
+        const ratio = Math.min(state.maxDpr || 1.4, window.devicePixelRatio || 1, Math.sqrt(1200000/(width*height)));
         const w=Math.round(width*ratio),h=Math.round(height*ratio);
         if(backgroundCanvas.width!==w||backgroundCanvas.height!==h){backgroundCanvas.width=w;backgroundCanvas.height=h;}
         gl.viewport(0,0,w,h); gl.useProgram(program); gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,texture);

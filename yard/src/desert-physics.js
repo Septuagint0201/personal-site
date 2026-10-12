@@ -342,8 +342,8 @@ export function createDesertPhysics(sand, { onDetach = () => {} } = {}) {
         velocities[a + 1] = Math.max(0, velocities[a + 1]) * .18;
         const impact = Math.max(0, previous[a + 1] - positions[a + 1]) / dt;
         const shear = Math.hypot(velocities[a], velocities[a + 2]);
-        if ((i + imprintTick) % 4 === 0) sand.stamp(positions[a], positions[a + 2], .29,
-          Math.min(.25, .08 + impact * .035), velocities[a], velocities[a + 2], impact * .55 + shear * .3);
+        if ((i + imprintTick) % 4 === 0) sand.stamp(positions[a], positions[a + 2], .34,
+          Math.min(.38, .105 + impact * .06), velocities[a], velocities[a + 2], impact * .55 + shear * .3);
       }
     }
     imprintTick++;
