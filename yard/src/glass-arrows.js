@@ -75,6 +75,7 @@ export function createGlassArrows({
     disposed = false,
     failed = false;
   const pointer = { x: innerWidth * 0.25, y: 0 };
+  let textureWidth = 0, textureHeight = 0, textureVersion, textureSource;
   const cleanups = [];
   function listen(target, type, callback) {
     const handler = (event) => {
@@ -85,6 +86,7 @@ export function createGlassArrows({
     cleanups.push(() => target.removeEventListener(type, handler));
   }
   function initialize() {
+    textureWidth = textureHeight = 0; textureVersion = undefined; textureSource = null;
     const compile = (type, text) => {
       const shader = gl.createShader(type);
       gl.shaderSource(shader, text);
@@ -202,14 +204,15 @@ export function createGlassArrows({
         gl.bindTexture(gl.TEXTURE_2D, texture);
         // Texture row 0 is the DOM image's top row; source sampling uses CSS Y-down.
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-        gl.texImage2D(
-          gl.TEXTURE_2D,
-          0,
-          gl.RGBA,
-          gl.RGBA,
-          gl.UNSIGNED_BYTE,
-          canvas,
-        );
+        if (value?.version === undefined || textureVersion !== value.version || textureSource !== canvas) {
+          if (textureWidth === canvas.width && textureHeight === canvas.height)
+            gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+          else {
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+            textureWidth = canvas.width; textureHeight = canvas.height;
+          }
+          textureVersion = value?.version; textureSource = canvas;
+        }
         gl.useProgram(program);
         gl.uniform4f(
           uniforms.sourceRect,

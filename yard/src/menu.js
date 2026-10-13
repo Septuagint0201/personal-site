@@ -7,7 +7,7 @@ import { createViewportRingGeometry } from "./menu-orbit-geometry.js";
 import "./interaction.css";
 import { createUIGlass } from './ui-glass.js';
 import './menu-safe-area.css';
-const uiGlass = createUIGlass();
+const uiGlass = createUIGlass({ maxFps: 60 });
 
 const stage = document.querySelector("#card-stage");
 const stack = document.querySelector("#cards");
@@ -53,15 +53,21 @@ const cardParts = cards.map(card => ({
   direction: card.querySelector('.side-direction'),
 }));
 const thumbs = [...rail.querySelectorAll("button")];
+let menuScene = null;
 const glassArrows = createGlassArrows({
-  source: () => document.querySelector("#glass-world"),
+  source: () => menuScene,
   onInvalidate: () => glass.invalidate(),
   buttons: [...document.querySelectorAll(".glass-arrow")],
   reducedMotion: motion.matches,
 });
 const glass = createMenuGlass({
   background: document.querySelector("#glass-world"),
-  onRender: () => { glassArrows.render(); uiGlass.capture(document.querySelector('#glass-world')); },
+  onRender: source => {
+    menuScene = source;
+    glassArrows.render();
+    uiGlass.capture(source.canvas, source.version);
+    if (!source.backgroundUpdated) uiGlass.invalidate();
+  },
   surfaces: cards.map((element) => ({
     element,
     canvas: element.querySelector("canvas"),

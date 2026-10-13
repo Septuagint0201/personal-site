@@ -3,11 +3,13 @@ import './interaction.css';
 import { createUIGlass } from './ui-glass.js';
 import { createPlayground } from './scene.js';
 import { createDiscoveries } from './discoveries.js';
+import { placeNoticeAbovePanel } from './notice-placement.js';
 
 const $ = selector => document.querySelector(selector);
 const stage = $('#stage');
 const uiGlass = createUIGlass();
 const toastElement = $('#toast');
+const positionToast = placeNoticeAbovePanel(toastElement, $('#controls'));
 const motion = matchMedia('(prefers-reduced-motion: reduce)');
 const unlocked = new Set();
 const captions = { prism: '01 — PRISM STUDY', halo: '02 — LIQUID KNOT', orbit: '03 — QUIET ORBITS' };
@@ -22,6 +24,7 @@ function toast(message) {
   clearTimeout(toastTimer);
   toastElement.textContent = message;
   toastElement.classList.add('is-visible');
+  positionToast();
   toastTimer = setTimeout(() => toastElement.classList.remove('is-visible'), 4200);
 }
 const discoveries = createDiscoveries({
@@ -125,6 +128,7 @@ $('#controls-toggle').addEventListener('click', () => {
   const expanded = button.getAttribute('aria-expanded') !== 'true';
   button.setAttribute('aria-expanded', String(expanded));
   button.setAttribute('aria-label', expanded ? 'Hide light and dispersion sliders' : 'Show light and dispersion sliders');
+  positionToast();
 });
 const help = $('#help-dialog');
 function chooseNotesTab(name, focus = false) {

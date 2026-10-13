@@ -4,13 +4,16 @@ import './glass-select.css';
 import { createGlassSelect } from './glass-select.js';
 import { createDesertScene } from './chapter03-scene.js';
 import { createUIGlass } from './ui-glass.js';
+import { placeNoticeAbovePanel } from './notice-placement.js';
 const uiGlass = createUIGlass();
 const $ = selector => document.querySelector(selector);
 const stage = $('#desert-stage'), study = $('#desert-study'), notes = $('#notes');
+const positionAnnouncement = placeNoticeAbovePanel($('#announcement'), $('.study-controls'));
 let scene, paused = false, announcementTimer, readyTimer, lastPhase;
 function announce(text) {
   clearTimeout(announcementTimer); $('#announcement').textContent = text;
   $('#announcement').classList.add('is-visible');
+  positionAnnouncement();
   announcementTimer = setTimeout(() => $('#announcement').classList.remove('is-visible'), 4200);
 }
 function showPause(value) {

@@ -23,6 +23,12 @@ vec3 uiNormal(vec3 p,float width){
  return b.y>b.z?normalize(vec3(g*slope*uiFront,1.)):normalize(vec3(g*slope*(1.-uiFront),-1.));
 }
 vec3 uiExit(vec3 origin,vec3 ray,vec2 halfSize,float width){
+ // A convex B slab exits through its planar rear when that hit is inside
+ // the footprint. Only edge exits and internal reflections need bisection.
+ if(uiFront> .99999&&ray.z<-.00001){
+  float t=-origin.z/ray.z;vec3 point=origin+ray*t;
+  if(t>=0.&&uiDistance(point.xy)<-.001)return point;
+ }
  vec3 lower=vec3(-halfSize,-uiThickness*(1.-uiFront)),upper=vec3(halfSize,uiThickness*uiFront),end=vec3(100000.);
  if(abs(ray.x)>.00001)end.x=((ray.x>0.?upper.x:lower.x)-origin.x)/ray.x;
  if(abs(ray.y)>.00001)end.y=((ray.y>0.?upper.y:lower.y)-origin.y)/ray.y;
@@ -51,6 +57,8 @@ vec3 uiSoftened(vec2 p,float spread){
 }
 vec3 uiTransmission(vec2 pixel,vec2 local,vec2 halfSize,float width,vec2 screenScale,float compact){
  float roughness=uiRoughness*mix(1.,${f(compactRoughness)},compact);
+ // Parallel flat interfaces have zero offset at every wavelength.
+ if(uiDistance(local)<=-width)return uiSoftened(pixel,roughness);
  vec2 r=uiOffset(local,halfSize,width,uiIOR-uiDispersion)*screenScale;
  vec2 g=uiOffset(local,halfSize,width,uiIOR)*screenScale;
  vec2 b=uiOffset(local,halfSize,width,uiIOR+uiDispersion)*screenScale;

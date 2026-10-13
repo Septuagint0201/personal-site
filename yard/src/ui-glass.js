@@ -3,18 +3,21 @@ import '../../liquid-glass.js';
 import './ui-glass.css';
 import './capsule-controls.css';
 import './notes-layout.css';
+import { createFramePacer } from './frame-pacing.js';
 
 export const UI_GLASS = window.SiteGlassPreset;
 
 // One compositor per page, fed immediately after the scene's final draw.
 // A retained snapshot supports paused scenes, dialogs and transient picker UI.
-export function createUIGlass({ dark = false } = {}) {
+export function createUIGlass({ dark = false, maxFps = 0 } = {}) {
   document.documentElement.style.setProperty('--ui-glass-radius', `${UI_GLASS.profile.radius}px`);
   const stage = document.createElement('div'), buffer = document.createElement('canvas');
   stage.className = 'ui-glass-stage'; stage.setAttribute('aria-hidden', 'true');
   stage.append(buffer); document.body.append(stage);
   const snapshot = document.createElement('canvas'), context = snapshot.getContext('2d', { alpha: false });
   let ready = false, disposed = false, lastCapture = -Infinity, pending = 0, until = 0, captureTimer = 0;
+  let capturedCanvas = null, capturedVersion;
+  const pacer = maxFps > 0 ? createFramePacer(maxFps) : null;
   const surfaces = () => {
     const nodes = [...document.querySelectorAll('button, a, dialog, .notes-card, .controls, .study-controls, .interaction-dock, .glass-select-menu, .move-stick, .stick-thumb, .toast, .announcement, .gallery-announcement')]
       .filter(node => !node.matches('.glass-arrow, .side-select, .stick-direction, .notes-shell')
@@ -50,7 +53,7 @@ export function createUIGlass({ dark = false } = {}) {
   function update(now) {
     pending = 0;
     if (disposed || document.hidden || !ready) return;
-    renderer.request();
+    if (!pacer || pacer.ready(now)) renderer.request();
     if (now < until) pending = requestAnimationFrame(update);
   }
   function invalidate() {
@@ -67,8 +70,10 @@ export function createUIGlass({ dark = false } = {}) {
   window.addEventListener('resize', invalidate);
   document.addEventListener('scroll', invalidate, true);
   document.addEventListener('pointermove', pointer, { passive: true });
-  function capture(canvas) {
+  function capture(canvas, version) {
     if (disposed || renderer.failed || document.hidden || !canvas?.width || !canvas?.height) return;
+    if (version !== undefined && canvas === capturedCanvas && version === capturedVersion) return;
+    capturedCanvas = canvas; capturedVersion = version;
     const now = performance.now();
     const ratio = Math.min(2, devicePixelRatio || 1, Math.sqrt(1600000 / (innerWidth * innerHeight)));
     const width = Math.round(innerWidth * ratio), height = Math.round(innerHeight * ratio);
@@ -78,7 +83,7 @@ export function createUIGlass({ dark = false } = {}) {
     ready = true;
     document.body.classList.toggle('ui-glass-ready', !renderer.failed);
     // Always retain the final frame, even when motion stops between UI ticks.
-    const flush = () => { captureTimer = 0; if (!disposed && !document.hidden) { lastCapture = performance.now(); renderer.refreshBackground(); } };
+    const flush = () => { captureTimer = 0; if (!disposed && !document.hidden) { lastCapture = performance.now(); pacer?.ready(lastCapture, true); renderer.refreshBackground(); } };
     if (now - lastCapture >= 1000 / 30 - .5) { clearTimeout(captureTimer); flush(); }
     else if (!captureTimer) captureTimer = setTimeout(flush, 1000 / 30 - (now - lastCapture));
   }

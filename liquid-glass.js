@@ -112,6 +112,11 @@
         : normalize(vec3(outward * slope * (1.0 - u_section.x), -1.0));
     }
     vec3 sectionExit(vec3 origin, vec3 ray, vec2 halfSize, float radius, float width) {
+      if (u_section.x > 0.99999 && ray.z < -0.00001) {
+        float t = -origin.z / ray.z;
+        vec3 point = origin + ray * t;
+        if (t >= 0.0 && roundedBox(point.xy, halfSize, radius) < -0.001) return point;
+      }
       vec3 lower = vec3(-halfSize, -u_material.y * (1.0 - u_section.x));
       vec3 upper = vec3(halfSize, u_material.y * u_section.x);
       vec3 end = vec3(100000.0);
@@ -210,7 +215,9 @@
       vec3 normal = normalize(vec3(outward * slope + crown, 1.0));
       float depth = u_material.y * localThickness * u_enabled;
       vec3 transmitted;
-      if (u_profile > 2.5) {
+      if (u_profile > 2.5 && dist <= -sectionWidth) {
+        transmitted = softened(p, u_material.z);
+      } else if (u_profile > 2.5) {
         transmitted = sectionTransmission(p, local, halfSize, radius, sectionWidth, normal, u_material.x);
         if (u_material.w > 0.0 && u_enabled > 0.0) {
           transmitted.r = sectionTransmission(p, local, halfSize, radius, sectionWidth, normal, u_material.x - u_material.w).r;

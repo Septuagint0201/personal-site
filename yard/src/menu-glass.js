@@ -233,7 +233,7 @@ function createPass(canvas, isSurface) {
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
     gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,255]));
-    return { gl, program, buffer, uniforms, canvas, texture, textureWidth: 0, textureHeight: 0, lost: false };
+    return { gl, program, buffer, uniforms, canvas, texture, textureWidth: 0, textureHeight: 0, textureVersion: -1, lost: false };
   } catch (error) {
     if (vertex) gl.deleteShader(vertex);
     if (fragment) gl.deleteShader(fragment);
@@ -267,6 +267,10 @@ export function createMenuGlass({
   let timeOrigin = performance.now();
   let hiddenAt = document.hidden ? timeOrigin : 0;
   const pacer = createFramePacer(30);
+  const backgroundPacer = createFramePacer(30);
+  const snapshot = document.createElement('canvas');
+  const snapshotContext = snapshot.getContext('2d', { alpha: false });
+  let backgroundDirty = true, sceneVersion = 0;
   const entries = [];
   const cleanups = [];
   const pointer = { x: 0.25, y: 0.22 };
@@ -294,6 +298,7 @@ export function createMenuGlass({
       const fresh = createPass(canvas, isSurface);
       if (!fresh) return;
       Object.assign(entry, fresh);
+      if (!isSurface) backgroundDirty = true;
       canvas.hidden = false;
       invalidate();
     };
@@ -361,10 +366,13 @@ export function createMenuGlass({
           : 0;
     if(isSurface){
       gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,entry.texture);
-      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
-      if(entry.textureWidth===background.width&&entry.textureHeight===background.height)
-        gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,gl.RGBA,gl.UNSIGNED_BYTE,background);
-      else {gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,background);entry.textureWidth=background.width;entry.textureHeight=background.height;}
+      if (entry.textureVersion !== sceneVersion) {
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+        if(entry.textureWidth===snapshot.width&&entry.textureHeight===snapshot.height)
+          gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,gl.RGBA,gl.UNSIGNED_BYTE,snapshot);
+        else {gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,snapshot);entry.textureWidth=snapshot.width;entry.textureHeight=snapshot.height;}
+        entry.textureVersion = sceneVersion;
+      }
       gl.uniform1i(uniforms.scene,0);
     }
     gl.viewport(0, 0, pixelWidth, pixelHeight);
@@ -394,8 +402,20 @@ export function createMenuGlass({
       const started = performance.now();
       // Finish layout/style reads before any canvas resize invalidates layout.
       const measurements = entries.map(measure);
-      entries.forEach((entry, i) => draw(entry, measurements[i], now));
-      onRender();
+      let backgroundUpdated = false;
+      const backgroundEntry = entries.findIndex(entry => !entry.isSurface);
+      if (backgroundEntry >= 0 && measurements[backgroundEntry]
+        && (backgroundDirty || (!staticMotion && backgroundPacer.ready(now)))) {
+        if (backgroundDirty) backgroundPacer.ready(now, true);
+        draw(entries[backgroundEntry], measurements[backgroundEntry], now);
+        if (snapshot.width !== background.width) snapshot.width = background.width;
+        if (snapshot.height !== background.height) snapshot.height = background.height;
+        snapshotContext.drawImage(background, 0, 0);
+        backgroundDirty = false; backgroundUpdated = true; sceneVersion++;
+      }
+      entries.forEach((entry, i) => { if (entry.isSurface && sceneVersion) draw(entry, measurements[i], now); });
+      if (sceneVersion) onRender({ canvas: snapshot, version: sceneVersion, backgroundUpdated,
+        rect: { left: 0, top: 0, width: innerWidth, height: innerHeight } });
       const spent = performance.now() - started;
       // Adapt after sustained pressure; avoid changing resolution on every frame.
       slowFrames =
@@ -404,6 +424,7 @@ export function createMenuGlass({
           : Math.max(0, slowFrames - 1);
       if (slowFrames > 18 && quality > 0.65) {
         quality = Math.max(0.65, quality - 0.12);
+        backgroundDirty = true;
         slowFrames = 0;
       }
       lastDraw = now;
@@ -426,6 +447,7 @@ export function createMenuGlass({
 
   function visibility() {
     pacer.reset();
+    backgroundPacer.reset();
     if (document.hidden) {
       hiddenAt = performance.now();
       cancelAnimationFrame(frame);
@@ -438,6 +460,7 @@ export function createMenuGlass({
   }
 
   function resize() {
+    backgroundDirty = true;
     entries.forEach(entry => { entry.layout = null; });
     invalidate();
   }
@@ -457,6 +480,7 @@ export function createMenuGlass({
     invalidate,
     setReducedMotion(value) {
       staticMotion = Boolean(value);
+      backgroundDirty = true;
       if (staticMotion) {
         cancelAnimationFrame(frame);
         frame = 0;
