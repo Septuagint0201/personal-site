@@ -1,0 +1,614 @@
+:root{
+  font-family:"Segoe UI","Microsoft YaHei",sans-serif;
+  color:#233c44;
+  background:#f3f2ed;
+  font-synthesis:none;
+  --line:#293f481c;
+  --ink:#233c44;
+  --accent:#287b78}
+  *{
+    box-sizing:border-box}
+    [hidden]{
+      display:none!important}
+      body{
+        margin:0}
+        button,input,select{
+          font:inherit}
+          button,a{
+            color:inherit;
+            -webkit-tap-highlight-color:transparent}
+            button{
+              cursor:pointer;
+              border:1px solid var(--line);
+              background:#ffffff83;
+              border-radius:9px;
+              padding:9px 12px;
+              font-size:12px;
+              transition:scale .16s,background .16s,box-shadow .16s}
+              button:hover,a:hover{
+                scale:1.025;
+                filter:brightness(1.06)}
+                button:hover{
+                  background:#fff;
+                  box-shadow:0 3px 12px #315b5411}
+                  button:active,a:active{
+                    scale:.96}
+                    button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,circle:focus-visible{
+                      outline:2px solid #287b78;
+                      outline-offset:4px}
+                      a{
+                        text-decoration:none;
+                        transition:scale .16s;
+                        display:inline-flex}
+                        header{
+                          padding:28px clamp(20px,4vw,64px);
+                          display:flex;
+                          align-items:center;
+                          justify-content:space-between;
+                          border-bottom:1px solid var(--line);
+                          gap:20px}
+                          .brand{
+                            align-items:center;
+                            gap:12px;
+                            font:italic 30px Georgia,serif}
+                            .brand>span{
+                              color:var(--accent);
+                              font-size:12px;
+                              margin-left:-12px;
+                              margin-top:-20px}
+                              .brand b{
+                                font:600 11px "Segoe UI",sans-serif;
+                                letter-spacing:1.8px}
+                                .brand small{
+                                  font-weight:400;
+                                  color:#6c7c7f;
+                                  display:block;
+                                  font-size:9px;
+                                  margin-top:5px;
+                                  letter-spacing:1.5px}
+                                  nav{
+                                    display:flex;
+                                    gap:24px;
+                                    font-size:11px;
+                                    color:#61777c}
+                                    main{
+                                      max-width:1580px;
+                                      margin:auto;
+                                      padding:34px clamp(20px,4vw,64px) 20px}
+                                      .intro{
+                                        display:flex;
+                                        align-items:end;
+                                        justify-content:space-between;
+                                        margin-bottom:28px;
+                                        gap:20px}
+                                        .eyebrow{
+                                          font-size:9px;
+                                          letter-spacing:2px;
+                                          color:#6d8385;
+                                          margin:0 0 12px}
+                                          .intro h1{
+                                            font-weight:500;
+                                            font-size:clamp(28px,3.2vw,44px);
+                                            letter-spacing:-1.5px;
+                                            margin:0 0 12px}
+                                            .intro h1 em{
+                                              font-style:normal;
+                                              color:#668a89}
+                                              .intro p:not(.eyebrow){
+                                                font-size:12px;
+                                                color:#6a7a7c;
+                                                margin:0;
+                                                line-height:1.8}
+                                                #render-status{
+                                                  font-size:10px;
+                                                  color:var(--accent);
+                                                  white-space:nowrap;
+                                                  padding-bottom:3px}
+                                                  .workspace{
+                                                    display:grid;
+                                                    grid-template-columns:minmax(0,1fr) 312px;
+                                                    gap:22px;
+                                                    align-items:start}
+                                                    .studies{
+                                                      min-width:0;
+                                                      display:grid;
+                                                      gap:20px}
+                                                      .panel{
+                                                        background:#ffffffa3;
+                                                        border:1px solid #ffffff;
+                                                        border-radius:20px;
+                                                        box-shadow:0 6px 28px #294b4810;
+                                                        overflow:hidden}
+                                                        .toolbar,.preview-footer{
+                                                          display:flex;
+                                                          justify-content:space-between;
+                                                          align-items:center;
+                                                          padding:14px;
+                                                          gap:10px;
+                                                          flex-wrap:wrap}
+                                                          .segmented{
+                                                            display:flex;
+                                                            gap:3px;
+                                                            padding:3px;
+                                                            background:#dce4df66;
+                                                            border-radius:11px}
+                                                            .segmented button{
+                                                              border:0;
+                                                              background:none;
+                                                              padding:7px 10px;
+                                                              color:#718482;
+                                                              box-shadow:none}
+                                                              .segmented button[aria-pressed=true]{
+                                                                background:#fff;
+                                                                color:var(--ink);
+                                                                box-shadow:0 2px 6px #294b4811}
+                                                                .toolbar-actions{
+                                                                  display:flex;
+                                                                  gap:5px}
+                                                                  .toolbar-actions button{
+                                                                    padding:7px 9px}
+                                                                    .toolbar-actions button[aria-pressed=true]{
+                                                                      background:#e0efeb;
+                                                                      color:#246d6b}
+                                                                      .viewport{
+                                                                        height:clamp(350px,36vw,510px);
+                                                                        position:relative;
+                                                                        background:#d4dedb;
+                                                                        overflow:hidden}
+                                                                        #glass-view{
+                                                                          display:block;
+                                                                          width:100%;
+                                                                          height:100%;
+                                                                          touch-action:none;
+                                                                          cursor:grab}
+                                                                          #glass-view:active{
+                                                                            cursor:grabbing}
+                                                                            .pane-label{
+                                                                              position:absolute;
+                                                                              top:20px;
+                                                                              font-size:9px;
+                                                                              letter-spacing:1.7px;
+                                                                              color:#29474a;
+                                                                              background:#f6fbf3b0;
+                                                                              padding:7px 10px;
+                                                                              border-radius:20px;
+                                                                              pointer-events:none}
+                                                                              .current-label{
+                                                                                left:20px}
+                                                                                .reference-label{
+                                                                                  left:20px}
+                                                                                  .viewport.comparing .current-label{
+                                                                                    left:calc(50% + 20px)}
+                                                                                    .viewport.comparing:after{
+                                                                                      content:"";
+                                                                                      position:absolute;
+                                                                                      top:0;
+                                                                                      bottom:0;
+                                                                                      left:50%;
+                                                                                      border-left:1px solid #23414744;
+                                                                                      pointer-events:none}
+                                                                                      .gesture{
+                                                                                        position:absolute;
+                                                                                        bottom:14px;
+                                                                                        left:0;
+                                                                                        right:0;
+                                                                                        text-align:center;
+                                                                                        font-size:10px;
+                                                                                        color:#345051b3;
+                                                                                        pointer-events:none;
+                                                                                        margin:0;
+                                                                                        text-shadow:0 1px 3px #fff}
+                                                                                        .preview-footer{
+                                                                                          padding:12px 16px;
+                                                                                          font-size:10px;
+                                                                                          color:#71817f}
+                                                                                          #render-fallback{
+                                                                                            position:absolute;
+                                                                                            inset:0;
+                                                                                            display:grid;
+                                                                                            place-content:center;
+                                                                                            padding:30px;
+                                                                                            font-size:14px;
+                                                                                            background:#e4e9df}
+                                                                                            .section-top{
+                                                                                              display:flex;
+                                                                                              justify-content:space-between;
+                                                                                              align-items:center;
+                                                                                              gap:12px}
+                                                                                              .section-top h2{
+                                                                                                font-size:17px;
+                                                                                                font-weight:500;
+                                                                                                letter-spacing:.5px;
+                                                                                                margin:0}
+                                                                                                .section-top .eyebrow{
+                                                                                                  margin-bottom:8px;
+                                                                                                  font-size:8px}
+                                                                                                  .section-top>span{
+                                                                                                    color:#688482;
+                                                                                                    font-size:10px}
+                                                                                                    .curve-panel,.section-panel{
+                                                                                                      padding:24px}
+                                                                                                      .section-copy{
+                                                                                                        font-size:11px;
+                                                                                                        color:#708581;
+                                                                                                        line-height:1.8;
+                                                                                                        margin:14px 0 0}
+                                                                                                        .curve-panel svg,.section-panel svg{
+                                                                                                          display:block;
+                                                                                                          width:100%;
+                                                                                                          overflow:visible}
+                                                                                                          #curve-editor{
+                                                                                                            touch-action:none;
+                                                                                                            user-select:none}
+                                                                                                            .plot-grid{
+                                                                                                              stroke:#4359501a;
+                                                                                                              stroke-width:1;
+                                                                                                              fill:none}
+                                                                                                              .plot-label{
+                                                                                                                font-size:10px;
+                                                                                                                fill:#7c8b87}
+                                                                                                                .live-curve{
+                                                                                                                  stroke:#2b8e85;
+                                                                                                                  stroke-width:2.6;
+                                                                                                                  fill:none}
+                                                                                                                  .reference-curve{
+                                                                                                                    stroke:#94a29d;
+                                                                                                                    stroke-dasharray:5 6;
+                                                                                                                    stroke-width:1.4;
+                                                                                                                    fill:none}
+                                                                                                                    #handle-lines{
+                                                                                                                      stroke:#71a69d;
+                                                                                                                      stroke-dasharray:3 4;
+                                                                                                                      fill:none}
+                                                                                                                      #bezier-handles circle{
+                                                                                                                        fill:#fff;
+                                                                                                                        stroke:#288b82;
+                                                                                                                        stroke-width:2;
+                                                                                                                        cursor:grab;
+                                                                                                                        transition:r .15s,fill .15s}
+                                                                                                                        #bezier-handles circle:hover{
+                                                                                                                          r:11;
+                                                                                                                          fill:#cfe8de}
+                                                                                                                          #bezier-handles circle:active{
+                                                                                                                            r:8;
+                                                                                                                            cursor:grabbing}
+                                                                                                                            .curve-readings{
+                                                                                                                              display:flex;
+                                                                                                                              justify-content:space-between;
+                                                                                                                              gap:8px;
+                                                                                                                              font-size:10px;
+                                                                                                                              color:#728580}
+                                                                                                                              .curve-readings b{
+                                                                                                                                font-size:12px;
+                                                                                                                                font-weight:500;
+                                                                                                                                color:var(--ink);
+                                                                                                                                display:block;
+                                                                                                                                margin-top:6px;
+                                                                                                                                font-variant-numeric:tabular-nums}
+                                                                                                                                #section-solid{
+                                                                                                                                  fill:#bbdcd27a;
+                                                                                                                                  stroke:#528f88;
+                                                                                                                                  stroke-width:1.7}
+                                                                                                                                  .section-reference{
+                                                                                                                                    fill:none;
+                                                                                                                                    stroke:#b0b8b1;
+                                                                                                                                    stroke-dasharray:4 5}
+                                                                                                                                    #section-midline{
+                                                                                                                                      stroke:#95aaa2;
+                                                                                                                                      stroke-width:1;
+                                                                                                                                      stroke-dasharray:3 6}
+                                                                                                                                      #section-dimensions{
+                                                                                                                                        fill:#668278;
+                                                                                                                                        font-size:10px}
+                                                                                                                                        #section-dimensions path{
+                                                                                                                                          stroke:#90aaa0;
+                                                                                                                                          stroke-width:1;
+                                                                                                                                          fill:none}
+                                                                                                                                          .controls{
+                                                                                                                                            padding:24px;
+                                                                                                                                            overflow:visible}
+                                                                                                                                            .controls h2{
+                                                                                                                                              font-size:18px}
+                                                                                                                                              .controls .section-top button{
+                                                                                                                                                font-size:10px;
+                                                                                                                                                padding:5px 8px}
+                                                                                                                                                .select-label{
+                                                                                                                                                  font-size:10px;
+                                                                                                                                                  display:block;
+                                                                                                                                                  color:#738780;
+                                                                                                                                                  margin:20px 0 8px}
+                                                                                                                                                  select{
+                                                                                                                                                    width:100%;
+                                                                                                                                                    padding:11px 10px;
+                                                                                                                                                    border-radius:10px;
+                                                                                                                                                    border:1px solid #48665226;
+                                                                                                                                                    background:#f7faf4;
+                                                                                                                                                    color:var(--ink);
+                                                                                                                                                    font-size:12px}
+                                                                                                                                                    fieldset{
+                                                                                                                                                      padding:22px 0 0;
+                                                                                                                                                      margin:22px 0 0;
+                                                                                                                                                      border:0;
+                                                                                                                                                      border-top:1px solid var(--line)}
+                                                                                                                                                      legend{
+                                                                                                                                                        font-size:12px;
+                                                                                                                                                        font-weight:600;
+                                                                                                                                                        letter-spacing:.5px;
+                                                                                                                                                        padding:0 8px 0 0}
+                                                                                                                                                        .shape-buttons{
+                                                                                                                                                          display:grid;
+                                                                                                                                                          grid-template-columns:repeat(4,1fr);
+                                                                                                                                                          gap:6px;
+                                                                                                                                                          margin-bottom:18px}
+                                                                                                                                                          .shape-buttons button{
+                                                                                                                                                            display:grid;
+                                                                                                                                                            justify-items:center;
+                                                                                                                                                            gap:3px;
+                                                                                                                                                            font-size:22px;
+                                                                                                                                                            background:#f8faf5}
+                                                                                                                                                            .shape-buttons span{
+                                                                                                                                                              font-size:9px}
+                                                                                                                                                              .shape-buttons button[aria-pressed=true]{
+                                                                                                                                                                border-color:#70a79b;
+                                                                                                                                                                background:#e2efea;
+                                                                                                                                                                color:#246f67}
+                                                                                                                                                                .control{
+                                                                                                                                                                  margin:15px 0}
+                                                                                                                                                                  .control-top{
+                                                                                                                                                                    display:flex;
+                                                                                                                                                                    align-items:center;
+                                                                                                                                                                    justify-content:space-between;
+                                                                                                                                                                    gap:12px}
+                                                                                                                                                                    .control label{
+                                                                                                                                                                      font-size:11px;
+                                                                                                                                                                      color:#526b68}
+                                                                                                                                                                      .control input[type=number]{
+                                                                                                                                                                        width:72px;
+                                                                                                                                                                        text-align:right;
+                                                                                                                                                                        background:#f7f9f4;
+                                                                                                                                                                        border:1px solid #37594c18;
+                                                                                                                                                                        border-radius:5px;
+                                                                                                                                                                        color:#294c47;
+                                                                                                                                                                        padding:3px 5px;
+                                                                                                                                                                        font-size:11px;
+                                                                                                                                                                        font-variant-numeric:tabular-nums}
+                                                                                                                                                                        .control input[type=range]{
+                                                                                                                                                                          width:100%;
+                                                                                                                                                                          margin:10px 0 0;
+                                                                                                                                                                          accent-color:#3a9187;
+                                                                                                                                                                          height:15px;
+                                                                                                                                                                          cursor:ew-resize;
+                                                                                                                                                                          touch-action:pan-y}
+                                                                                                                                                                          .control .limits{
+                                                                                                                                                                            display:flex;
+                                                                                                                                                                            justify-content:space-between;
+                                                                                                                                                                            color:#97a39d;
+                                                                                                                                                                            font-size:8px;
+                                                                                                                                                                            margin-top:2px}
+                                                                                                                                                                            .small-note{
+                                                                                                                                                                              font-size:10px;
+                                                                                                                                                                              line-height:1.8;
+                                                                                                                                                                              color:#7e918a;
+                                                                                                                                                                              margin:12px 0 0}
+                                                                                                                                                                              .check{
+                                                                                                                                                                                display:flex;
+                                                                                                                                                                                align-items:center;
+                                                                                                                                                                                gap:6px;
+                                                                                                                                                                                font-size:10px;
+                                                                                                                                                                                line-height:1.6;
+                                                                                                                                                                                color:#627d73;
+                                                                                                                                                                                margin-top:15px}
+                                                                                                                                                                                .check input{
+                                                                                                                                                                                  accent-color:var(--accent)}
+                                                                                                                                                                                  .actions{
+                                                                                                                                                                                    display:grid;
+                                                                                                                                                                                    grid-template-columns:1fr 1fr;
+                                                                                                                                                                                    gap:8px;
+                                                                                                                                                                                    border-top:1px solid var(--line);
+                                                                                                                                                                                    padding-top:20px;
+                                                                                                                                                                                    margin-top:22px}
+                                                                                                                                                                                    .actions button{
+                                                                                                                                                                                      font-size:11px;
+                                                                                                                                                                                      padding:11px 8px}
+                                                                                                                                                                                      .actions .primary{
+                                                                                                                                                                                        grid-column:1/-1;
+                                                                                                                                                                                        background:#2c7870;
+                                                                                                                                                                                        color:#fff;
+                                                                                                                                                                                        border-color:#2c7870;
+                                                                                                                                                                                        order:3}
+                                                                                                                                                                                        .actions #import{
+                                                                                                                                                                                          grid-column:1/-1;
+                                                                                                                                                                                          order:4}
+                                                                                                                                                                                          .status{
+                                                                                                                                                                                            font-size:10px;
+                                                                                                                                                                                            line-height:1.8;
+                                                                                                                                                                                            color:#6c8178;
+                                                                                                                                                                                            min-height:36px;
+                                                                                                                                                                                            margin-bottom:0}
+                                                                                                                                                                                            .method{
+                                                                                                                                                                                              margin-top:25px;
+                                                                                                                                                                                              color:#75887e;
+                                                                                                                                                                                              font-size:11px;
+                                                                                                                                                                                              line-height:1.9;
+                                                                                                                                                                                              max-width:950px}
+                                                                                                                                                                                              .method summary{
+                                                                                                                                                                                                cursor:pointer;
+                                                                                                                                                                                                display:flex;
+                                                                                                                                                                                                justify-content:space-between;
+                                                                                                                                                                                                padding:10px 0;
+                                                                                                                                                                                                border-bottom:1px solid var(--line);
+                                                                                                                                                                                                color:#547067}
+                                                                                                                                                                                                .method p{
+                                                                                                                                                                                                  margin:14px 0}
+                                                                                                                                                                                                  footer{
+                                                                                                                                                                                                    max-width:1580px;
+                                                                                                                                                                                                    margin:auto;
+                                                                                                                                                                                                    display:flex;
+                                                                                                                                                                                                    gap:18px;
+                                                                                                                                                                                                    justify-content:center;
+                                                                                                                                                                                                    font-size:9px;
+                                                                                                                                                                                                    letter-spacing:2px;
+                                                                                                                                                                                                    color:#7d9085;
+                                                                                                                                                                                                    padding:34px 20px 40px}
+                                                                                                                                                                                                    @media(min-width:1450px){
+                                                                                                                                                                                                      .workspace{
+                                                                                                                                                                                                        grid-template-columns:minmax(0,1fr) 352px}
+                                                                                                                                                                                                      }
+                                                                                                                                                                                                      @media(max-width:950px){
+                                                                                                                                                                                                        main{
+                                                                                                                                                                                                          padding:25px 18px}
+                                                                                                                                                                                                          .workspace{
+                                                                                                                                                                                                            grid-template-columns:minmax(0,1fr) 278px;
+                                                                                                                                                                                                            gap:14px}
+                                                                                                                                                                                                            .controls{
+                                                                                                                                                                                                              padding:18px}
+                                                                                                                                                                                                              .toolbar{
+                                                                                                                                                                                                                padding:10px}
+                                                                                                                                                                                                                .toolbar-actions button{
+                                                                                                                                                                                                                  font-size:10px}
+                                                                                                                                                                                                                  .curve-panel,.section-panel{
+                                                                                                                                                                                                                    padding:18px}
+                                                                                                                                                                                                                    .intro{
+                                                                                                                                                                                                                      align-items:start;
+                                                                                                                                                                                                                      flex-direction:column;
+                                                                                                                                                                                                                      gap:16px}
+                                                                                                                                                                                                                    }
+                                                                                                                                                                                                                    @media(max-width:720px){
+                                                                                                                                                                                                                      header{
+                                                                                                                                                                                                                        padding:20px 18px}
+                                                                                                                                                                                                                        nav{
+                                                                                                                                                                                                                          gap:14px}
+                                                                                                                                                                                                                          .workspace{
+                                                                                                                                                                                                                            grid-template-columns:1fr}
+                                                                                                                                                                                                                            .viewport{
+                                                                                                                                                                                                                              height:370px}
+                                                                                                                                                                                                                              .controls{
+                                                                                                                                                                                                                                display:block}
+                                                                                                                                                                                                                                .controls fieldset{
+                                                                                                                                                                                                                                  padding-top:15px}
+                                                                                                                                                                                                                                  .curve-panel,.section-panel{
+                                                                                                                                                                                                                                    padding:18px}
+                                                                                                                                                                                                                                    .curve-readings{
+                                                                                                                                                                                                                                      font-size:9px}
+                                                                                                                                                                                                                                      .toolbar-actions button,.segmented button{
+                                                                                                                                                                                                                                        min-height:36px}
+                                                                                                                                                                                                                                        .shape-buttons button{
+                                                                                                                                                                                                                                          min-height:52px}
+                                                                                                                                                                                                                                          button{
+                                                                                                                                                                                                                                            min-height:40px}
+                                                                                                                                                                                                                                            .intro h1{
+                                                                                                                                                                                                                                              font-size:30px}
+                                                                                                                                                                                                                                              .section-copy{
+                                                                                                                                                                                                                                                font-size:10px}
+                                                                                                                                                                                                                                              }
+                                                                                                                                                                                                                                              @media(prefers-reduced-motion:reduce){
+                                                                                                                                                                                                                                                *{
+                                                                                                                                                                                                                                                  transition:none!important}
+                                                                                                                                                                                                                                                  button:hover,a:hover,button:active,a:active{
+                                                                                                                                                                                                                                                    scale:1}
+                                                                                                                                                                                                                                                  }
+                                                                                                                                                                                                                                                  @media(min-width:1050px){
+                                                                                                                                                                                                                                                    header{
+                                                                                                                                                                                                                                                      padding-block:20px}
+                                                                                                                                                                                                                                                      main{
+                                                                                                                                                                                                                                                        padding-top:24px}
+                                                                                                                                                                                                                                                        .intro{
+                                                                                                                                                                                                                                                          margin-bottom:22px}
+                                                                                                                                                                                                                                                          .intro h1{
+                                                                                                                                                                                                                                                            font-size:36px;
+                                                                                                                                                                                                                                                            margin-bottom:8px}
+                                                                                                                                                                                                                                                            .studies{
+                                                                                                                                                                                                                                                              position:sticky;
+                                                                                                                                                                                                                                                              top:16px;
+                                                                                                                                                                                                                                                              grid-template-columns:1fr 1fr;
+                                                                                                                                                                                                                                                              gap:16px}
+                                                                                                                                                                                                                                                              .preview-panel{
+                                                                                                                                                                                                                                                                grid-column:1/-1}
+                                                                                                                                                                                                                                                                .viewport{
+                                                                                                                                                                                                                                                                  height:clamp(210px,31vh,360px)}
+                                                                                                                                                                                                                                                                  .curve-panel,.section-panel{
+                                                                                                                                                                                                                                                                    padding:18px;
+                                                                                                                                                                                                                                                                    min-width:0}
+                                                                                                                                                                                                                                                                    .section-top{
+                                                                                                                                                                                                                                                                      align-items:start}
+                                                                                                                                                                                                                                                                      .section-top h2{
+                                                                                                                                                                                                                                                                        font-size:15px}
+                                                                                                                                                                                                                                                                        .section-top button{
+                                                                                                                                                                                                                                                                          font-size:9px;
+                                                                                                                                                                                                                                                                          padding:6px}
+                                                                                                                                                                                                                                                                          .section-copy{
+                                                                                                                                                                                                                                                                            font-size:10px;
+                                                                                                                                                                                                                                                                            margin-top:10px}
+                                                                                                                                                                                                                                                                            .curve-readings{
+                                                                                                                                                                                                                                                                              font-size:8px;
+                                                                                                                                                                                                                                                                              flex-wrap:wrap}
+                                                                                                                                                                                                                                                                              .curve-readings b{
+                                                                                                                                                                                                                                                                                font-size:11px}
+                                                                                                                                                                                                                                                                                .section-panel svg{
+                                                                                                                                                                                                                                                                                  margin-top:14px}
+                                                                                                                                                                                                                                                                                }
+                                                                                                                                                                                                                                                                                @media(max-width:720px){
+                                                                                                                                                                                                                                                                                  .workspace{
+                                                                                                                                                                                                                                                                                    display:flex;
+                                                                                                                                                                                                                                                                                    flex-direction:column;
+                                                                                                                                                                                                                                                                                    gap:16px}
+                                                                                                                                                                                                                                                                                    .studies{
+                                                                                                                                                                                                                                                                                      display:contents}
+                                                                                                                                                                                                                                                                                      .studies>section,.controls{
+                                                                                                                                                                                                                                                                                        width:100%}
+                                                                                                                                                                                                                                                                                        .preview-panel{
+                                                                                                                                                                                                                                                                                          position:sticky;
+                                                                                                                                                                                                                                                                                          top:6px;
+                                                                                                                                                                                                                                                                                          z-index:5;
+                                                                                                                                                                                                                                                                                          background:#f8faf5;
+                                                                                                                                                                                                                                                                                          box-shadow:0 6px 22px #294b4830}
+                                                                                                                                                                                                                                                                                          .viewport{
+                                                                                                                                                                                                                                                                                            height:210px}
+                                                                                                                                                                                                                                                                                            .preview-footer{
+                                                                                                                                                                                                                                                                                              padding:6px 10px}
+                                                                                                                                                                                                                                                                                              .toolbar{
+                                                                                                                                                                                                                                                                                                padding:8px;
+                                                                                                                                                                                                                                                                                                gap:6px}
+                                                                                                                                                                                                                                                                                                .toolbar-actions button,.segmented button{
+                                                                                                                                                                                                                                                                                                  min-height:32px;
+                                                                                                                                                                                                                                                                                                  font-size:10px;
+                                                                                                                                                                                                                                                                                                  padding:6px 8px}
+                                                                                                                                                                                                                                                                                                  .gesture{
+                                                                                                                                                                                                                                                                                                    font-size:8px;
+                                                                                                                                                                                                                                                                                                    bottom:8px}
+                                                                                                                                                                                                                                                                                                    .pane-label{
+                                                                                                                                                                                                                                                                                                      top:12px;
+                                                                                                                                                                                                                                                                                                      left:12px;
+                                                                                                                                                                                                                                                                                                      font-size:8px}
+                                                                                                                                                                                                                                                                                                      .viewport.comparing .current-label{
+                                                                                                                                                                                                                                                                                                        left:calc(50% + 12px)}
+                                                                                                                                                                                                                                                                                                      }
+/* Larger invisible targets preserve a precise curve without tiny touch handles. */
+#bezier-handles .handle-hit {
+  fill: transparent;
+  stroke: none;
+  cursor: grab;
+  pointer-events: all;
+}
+#bezier-handles .handle-hit:hover,
+#bezier-handles .handle-hit:active { r: 34; }
+#bezier-handles:has(#grab-1:hover) #handle-1,
+#bezier-handles:has(#grab-2:hover) #handle-2 { fill: #cfe8de; }
+:where(select, input[type=number], summary) {
+  transition: scale 160ms, box-shadow 160ms, background-color 160ms;
+}
+:where(select, input[type=number], summary):hover {
+  scale: 1.01;
+  box-shadow: 0 0 0 1px #65a49944;
+}
+:where(select, input[type=number], summary):active { scale: .99; }
+input[type=range]:hover { filter: brightness(1.12); }
+@media(max-width:720px) {
+  #bezier-handles .handle-hit,
+  #bezier-handles .handle-hit:hover,
+  #bezier-handles .handle-hit:active { r: 42; }
+}
+@media(prefers-reduced-motion:reduce) {
+  :where(select, input[type=number], summary):hover,
+  :where(select, input[type=number], summary):active { scale: 1; }
+}
