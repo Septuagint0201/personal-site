@@ -1,6 +1,7 @@
 import '../../ui-glass-preset.js';
 import '../../liquid-glass.js';
 import './ui-glass.css';
+import './capsule-controls.css';
 
 export const UI_GLASS = window.SiteGlassPreset;
 
@@ -21,6 +22,9 @@ export function createUIGlass({ dark = false } = {}) {
       node.classList.add('ui-glass-surface', 'glass-surface');
       node.dataset.radius = String(UI_GLASS.profile.radius);
       node.style.borderRadius = `${UI_GLASS.profile.radius}px`;
+      if (node.matches('button, a, [role="option"]')
+        && !node.matches('.thumbnail, .dialog-close, .notes-close, .close-notes, .controls-toggle')
+        && /[\p{L}\p{N}]/u.test(node.textContent)) node.classList.add('capsule-control');
       if (node.matches('button, a, [role="option"], .stick-thumb')) node.setAttribute('data-glass-compact', '');
       if (getComputedStyle(node).position === 'static') node.style.position = 'relative';
     }

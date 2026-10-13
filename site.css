@@ -151,6 +151,7 @@ main {
 }
 .interests {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   align-items: center;
   gap: 6px;
@@ -161,6 +162,10 @@ main {
   letter-spacing: 1.4px;
 }
 .interests span {
+  min-inline-size: 54px;
+  max-inline-size: 100%;
+  text-align: center;
+  overflow-wrap: anywhere;
   padding: 3px 11px;
   border: 1px solid var(--hairline);
   border-radius: 20px;
@@ -331,6 +336,8 @@ body:not(.glass-active) .links a {
   letter-spacing: 2px;
 }
 .link-copy {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
   display: grid;
   gap: 4px;
   text-align: left;
@@ -366,6 +373,7 @@ body:not(.glass-active) .links a {
   font-size: 15px;
 }
 .link-arrow {
+  flex-shrink: 0;
   margin-left: auto;
   font-size: 18px;
   font-weight: 400;
@@ -791,6 +799,8 @@ body:not(.glass-active) .links a {
 @keyframes content-fade {
   from { opacity: 0; }
 }
+.links a > span:not(.link-arrow):not(.ripple) { min-inline-size: 0; overflow-wrap: anywhere; }
+.links a { line-height: 1.4; padding-block: 10px; }
 /* Local A/B preview controls; absent from the ordinary homepage. */
 #glass-comparison {
   position: fixed;

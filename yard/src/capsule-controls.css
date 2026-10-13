@@ -1,0 +1,107 @@
+/* Text capsules have a useful minimum, then grow or wrap with their label.
+   Explicit groups keep similar neighbouring actions equal, including toggles. */
+:root .ui-glass-surface.capsule-control {
+  --capsule-min: 88px;
+  box-sizing: border-box;
+  min-inline-size: min(var(--capsule-min), 100%);
+  inline-size: var(--capsule-size, max-content);
+  max-inline-size: 100%;
+  min-block-size: 38px;
+  block-size: auto;
+  padding: 9px var(--capsule-pad, 18px);
+  justify-content: center;
+  text-align: center;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+:root .capsule-control > :is(span, small) { min-inline-size: 0; }
+:root .capsule-control > :is(svg, .action-symbol, .glass-select-chevron, .glass-select-check) { flex-shrink: 0; }
+:root .header-actions .capsule-control { --capsule-size: 120px; }
+:root .header-actions .discovery-star { font-size: 18px; line-height: 1; }
+:root .secondary-actions { gap: 8px; white-space: normal; }
+:root .secondary-actions .capsule-control { --capsule-size: 104px; margin-block: 0; }
+:root .secondary-actions > span { display: none; }
+:root .control-actions { min-inline-size: 0; }
+:root .control-actions .pulse-button { --capsule-size: 100%; }
+:root .study-controls { gap: 8px; max-inline-size: calc(100% - 32px); }
+:root .study-controls .capsule-control { --capsule-size: 104px; flex-shrink: 0; min-block-size: 44px; }
+:root .study-controls #squeeze { --capsule-size: 152px; }
+:root .interaction-dock .matter-action { --capsule-size: 88px; min-block-size: 74px; }
+:root .chamber-settings > .capsule-control { --capsule-size: 104px; }
+:root .glass-select { min-inline-size: 0; max-inline-size: 100%; }
+:root .glass-select-trigger.capsule-control { --capsule-size: 104px; justify-content: space-between; gap: 12px; }
+:root .glass-select-option.capsule-control { --capsule-size: 100%; justify-content: space-between; gap: 12px; }
+:root .glass-select-trigger > span:first-child,
+:root .glass-select-option > span:first-child { min-inline-size: 0; overflow-wrap: anywhere; }
+:root .notes-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 112px), 1fr));
+  gap: 6px;
+}
+:root .notes-tabs .capsule-control { --capsule-size: 100%; --capsule-pad: 14px; }
+:root .notes-footer { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 112px), 1fr)); gap: 8px; }
+:root .notes-footer .capsule-control { --capsule-size: 100%; }
+:root .enter-chapter.capsule-control { --capsule-size: 152px; gap: 12px; }
+:root .card-tags { flex-wrap: wrap; }
+:root .card-tags > span { min-inline-size: 64px; text-align: center; white-space: normal; overflow-wrap: anywhere; }
+
+@media (max-width: 1100px) and (min-width: 901px) {
+  :root .controls { grid-template-columns: 1fr 1fr 1fr minmax(212px, 1.3fr); gap: 14px; }
+  :root .control-actions { padding-inline-start: 14px; }
+  :root .secondary-actions .capsule-control { --capsule-size: 94px; --capsule-pad: 12px; }
+}
+@media (max-width: 900px), (max-height: 500px) and (orientation: landscape) {
+  :root .controls,
+  :root .controls-toggle[aria-expanded="true"] ~ .controls { padding: 12px 18px; }
+  :root .control-actions,
+  :root .controls-toggle[aria-expanded="true"] ~ .controls .control-actions {
+    display: grid; grid-template-columns: 1fr; gap: 6px;
+  }
+  :root .control-actions .secondary-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  :root .control-actions .capsule-control { --capsule-size: 100%; --capsule-min: 72px; --capsule-pad: 10px; min-block-size: 44px; }
+  :root .experience .interaction-hint { bottom: calc(230px + env(safe-area-inset-bottom)); }
+  :root .experience .look-around-hint { bottom: calc(250px + env(safe-area-inset-bottom)); }
+}
+@media (max-width: 760px), (pointer: coarse) {
+  :root .ui-glass-surface.capsule-control { --capsule-min: 72px; --capsule-pad: 14px; min-block-size: 40px; }
+  :root .header-actions { gap: 6px; }
+  :root .header-actions .capsule-control { --capsule-size: 88px; --capsule-pad: 10px; }
+  :root .experience .header-actions .capsule-control { --capsule-size: 96px; }
+  :root .experience .control-actions .capsule-control { min-block-size: 44px; }
+  :root .liquid-gallery .header-actions #sound-toggle { --capsule-min: 40px; --capsule-size: 40px; --capsule-pad: 8px; }
+  :root .liquid-gallery .header-actions #discoveries-open { --capsule-min: 64px; --capsule-size: 64px; --capsule-pad: 8px; }
+  :root .interaction-dock .matter-action { --capsule-min: 48px; --capsule-size: 56px; --capsule-pad: 7px; min-block-size: 63px; }
+  :root .chamber-settings { gap: 6px; }
+  :root .chamber-settings > .capsule-control,
+  :root .chamber-settings .glass-select-trigger { --capsule-size: 88px; --capsule-pad: 10px; }
+  :root .quality-control { padding-inline-end: 0; }
+  :root .glass-select-option.capsule-control { min-block-size: 44px; }
+  :root .study-controls { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; padding: 8px 12px; }
+  :root .study-controls .capsule-control { --capsule-size: 100%; --capsule-pad: 8px; min-inline-size: 0; grid-column: span 2; min-block-size: 44px; }
+  :root .study-controls :is(#push, #squeeze) { --capsule-size: 100%; grid-column: span 3; }
+  :root .study-controls .control-divider { display: none; }
+  :root .enter-chapter.capsule-control { --capsule-size: 132px; --capsule-pad: 12px; gap: 8px; }
+  :root .wordmark.capsule-control { --capsule-pad: 12px; gap: 7px; }
+  :root .study-header { gap: 10px; left: 16px; right: 16px; }
+  :root .study-header .wordmark small { margin-left: 0; }
+}
+@media (max-width: 520px) {
+  :root .experience .site-header { display: grid; grid-template-columns: 1fr; gap: 6px; }
+  :root .experience .site-header .identity { justify-self: start; }
+  :root .experience .site-header .header-actions { justify-self: end; }
+  :root .experience .header-divider { display: none; }
+  :root .experience .intro { top: 128px; }
+}
+@media (max-width: 370px) {
+  :root .liquid-gallery .gallery-header { left: 12px; right: 12px; gap: 8px; }
+  :root .liquid-gallery .header-actions { gap: 4px; }
+  :root .liquid-gallery .yard-identity.capsule-control {
+    --capsule-pad: 6px; --capsule-size: 88px; min-inline-size: 88px;
+    flex-shrink: 0; font-size: 14px; letter-spacing: .12em; gap: 4px;
+  }
+  :root .liquid-gallery .yard-identity svg { width: 18px; height: 18px; }
+  :root .interaction-dock .matter-action { --capsule-size: 50px; --capsule-min: 48px; --capsule-pad: 5px; }
+  :root .chamber-settings > .capsule-control,
+  :root .chamber-settings .glass-select-trigger { --capsule-size: 82px; --capsule-pad: 8px; }
+}

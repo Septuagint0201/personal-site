@@ -505,6 +505,9 @@
           surface.append(canvas);
           layer = { canvas, ctx: canvas.getContext('2d') }; this.layers.set(surface, layer);
         }
+        // Text-only labels (Pause/Resume, Sound on/off) can replace child nodes.
+        // Reattach their existing layer rather than leaving a detached canvas.
+        if (layer.canvas.parentElement !== surface) surface.append(layer.canvas);
         const width = Math.max(1, Math.round(rect.width * view.dpr)), height = Math.max(1, Math.round(rect.height * view.dpr));
         if (layer.canvas.width !== width) layer.canvas.width = width;
         if (layer.canvas.height !== height) layer.canvas.height = height;
