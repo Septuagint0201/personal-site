@@ -7,6 +7,7 @@ import { createViewportRingGeometry } from "./menu-orbit-geometry.js";
 import "./interaction.css";
 import { createUIGlass } from './ui-glass.js';
 import './menu-safe-area.css';
+import './menu-card-fills.css';
 const uiGlass = createUIGlass({ maxFps: 60 });
 
 const stage = document.querySelector("#card-stage");
@@ -43,7 +44,7 @@ stack.innerHTML = chapters
 rail.innerHTML = chapters
   .map(
     (c, i) =>
-      `<button class="thumbnail" type="button" data-index="${i}" aria-label="Chapter ${c.id}: ${escape(c.shortTitle)}, ${c.status}" aria-controls="chapter-${c.id}"><span class="thumb-image" data-accent="${c.accent}"><img src="${c.cover}" alt="" draggable="false"/><span>${c.id}</span>${c.href ? '<i class="thumb-live"></i>' : ""}</span><span class="thumb-title">${c.shortTitle}</span></button>`,
+      `<button class="thumbnail" type="button" data-index="${i}" data-accent="${c.accent}" aria-label="Chapter ${c.id}: ${escape(c.shortTitle)}, ${c.status}" aria-controls="chapter-${c.id}"><span class="thumb-content"><span class="thumb-image"><img src="${c.cover}" alt="" draggable="false"/><span>${c.id}</span>${c.href ? '<i class="thumb-live"></i>' : ""}</span><span class="thumb-title">${c.shortTitle}</span></span></button>`,
   )
   .join("");
 const cards = [...stack.children];

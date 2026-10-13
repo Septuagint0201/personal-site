@@ -1,0 +1,75 @@
+/* A single colour wash follows the same silhouette as each glass surface. */
+:is(.chapter-card, .thumbnail) {
+  --card-fill-light: 231 248 252;
+  --card-fill-deep: 164 199 210;
+}
+:is(.chapter-card, .thumbnail)[data-accent="rose"] {
+  --card-fill-light: 247 222 218;
+  --card-fill-deep: 203 169 194;
+}
+:is(.chapter-card, .thumbnail)[data-accent="amber"] {
+  --card-fill-light: 250 237 210;
+  --card-fill-deep: 222 185 127;
+}
+:is(.chapter-card, .thumbnail)[data-accent="mint"] {
+  --card-fill-light: 220 244 234;
+  --card-fill-deep: 154 192 195;
+}
+.card-surface::before,
+.thumbnail::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(130deg,
+    rgb(var(--card-fill-light) / var(--card-fill-start)),
+    rgb(var(--card-fill-deep) / var(--card-fill-end)));
+}
+.card-surface::before {
+  --card-fill-start: .18;
+  --card-fill-end: .08;
+  z-index: 1;
+}
+.card-details { z-index: 2; }
+.thumbnail::after {
+  --card-fill-start: .56;
+  --card-fill-end: .30;
+  z-index: 0;
+}
+.thumb-content {
+  display: block;
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  border-radius: inherit;
+}
+.thumbnail .thumb-image {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.thumbnail .thumb-image img {
+  mask-image: linear-gradient(#000 65%, transparent 100%);
+}
+.thumbnail .thumb-title {
+  position: relative;
+  z-index: 1;
+  margin-top: 4px;
+  padding: 0 12px 10px;
+  text-align: center;
+}
+.thumbnail .thumb-image > span { top: 13px; left: 22px; }
+.thumbnail[aria-current="true"] .thumb-image { box-shadow: none; }
+.thumbnail[aria-current="true"]::after {
+  box-shadow: inset 0 0 0 1px #4c859470, inset 0 0 0 3px #ffffff40;
+}
+@media (min-width: 761px) and (max-width: 1000px) {
+  .thumbnail .thumb-title { min-height: calc(2.8em + 10px); }
+}
+@media (max-width: 760px) {
+  .thumbnail .thumb-image > span { top: 9px; left: 11px; }
+  .thumbnail .thumb-live { bottom: 8px; left: 11px; }
+}
