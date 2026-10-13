@@ -1,0 +1,43 @@
+/* The native dialog owns focus/backdrop; the card and close button are siblings. */
+:root dialog.notes-shell {
+  padding: 0; border: 0; background: transparent; box-shadow: none;
+  overflow: visible; border-radius: 0; isolation: isolate;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+:root .notes-shell > form { display: contents; }
+:root .notes-shell::before { display: none; }
+.notes-card {
+  position: relative; max-block-size: inherit; border: 0; overflow: hidden;
+  border-radius: 70px 176px 70px 70px;
+  background: linear-gradient(130deg, #fff9edc4, #e2e4dba8);
+  box-shadow: 0 24px 70px #15232d33, inset 0 0 0 1px #edf6fba3;
+}
+.notes-scroll {
+  position: relative; max-block-size: inherit; overflow: auto;
+  padding: 42px 40px 38px; border-radius: inherit;
+  scrollbar-width: thin; scrollbar-color: #75899470 transparent;
+  overscroll-behavior: contain;
+}
+.notes-scroll:focus-visible { outline: 2px solid #86acbb80; outline-offset: -6px; }
+:root .notes-shell .notes-detached-close {
+  position: absolute; top: 6px; right: 6px; bottom: auto; left: auto;
+  float: none; margin: 0; padding: 0; z-index: 4;
+  width: 44px; height: 44px; min-width: 44px; min-height: 44px;
+  display: grid; place-items: center; border-radius: 50%;
+  font-size: 26px; line-height: 1; box-shadow: 0 2px 7px #1c283022;
+}
+:root .notes-shell .notes-detached-close:focus-visible { outline-offset: 2px; }
+.ray-notes .notes-card { background: linear-gradient(140deg, #253341ed, #111c29d6); }
+:root .help-dialog.notes-shell {
+  --line: #456b822d; --accent: #326b87; color: #294757; color-scheme: light;
+}
+.help-dialog.notes-shell .notes-scroll :where(p, span, dt, dd, a, button, kbd, h2, h3, em) { color: inherit; }
+.help-dialog.notes-shell .notes-scroll :is(.eyebrow, .notes-caption, dt, .path-note, .discovery-state) { color: #4d697a; }
+.help-dialog.notes-shell .notes-scroll button[aria-selected="true"] { color: #173e50; font-weight: 600; }
+.help-dialog.notes-shell .notes-scroll .is-discovered .discovery-state { color: #256b59; }
+.help-dialog.notes-shell .notes-tabs { background: #416b8010; }
+:root .help-dialog.notes-shell .notes-detached-close { color: #294757; }
+.ray-notes .notes-scroll > .gallery-eyebrow { font-size: 7px; margin-bottom: 18px; color: #95b1c6; }
+@media (max-width: 760px) {
+  .notes-scroll { padding: 38px 28px 32px; }
+}

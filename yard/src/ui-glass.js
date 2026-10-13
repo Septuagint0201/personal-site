@@ -2,6 +2,7 @@ import '../../ui-glass-preset.js';
 import '../../liquid-glass.js';
 import './ui-glass.css';
 import './capsule-controls.css';
+import './notes-layout.css';
 
 export const UI_GLASS = window.SiteGlassPreset;
 
@@ -15,13 +16,17 @@ export function createUIGlass({ dark = false } = {}) {
   const snapshot = document.createElement('canvas'), context = snapshot.getContext('2d', { alpha: false });
   let ready = false, disposed = false, lastCapture = -Infinity, pending = 0, until = 0, captureTimer = 0;
   const surfaces = () => {
-    const nodes = [...document.querySelectorAll('button, a, [role="option"], dialog, .controls, .study-controls, .interaction-dock, .glass-select-menu, .move-stick, .stick-thumb, .toast, .announcement, .gallery-announcement')]
-      .filter(node => !node.matches('.glass-arrow, .side-select, .stick-direction')
+    const nodes = [...document.querySelectorAll('button, a, dialog, .notes-card, .controls, .study-controls, .interaction-dock, .glass-select-menu, .move-stick, .stick-thumb, .toast, .announcement, .gallery-announcement')]
+      .filter(node => !node.matches('.glass-arrow, .side-select, .stick-direction, .notes-shell')
         && !node.closest('.noscript, noscript, .loading, .render-loading, .fallback, .render-fallback'));
     for (const node of nodes) if (!node.classList.contains('ui-glass-surface')) {
       node.classList.add('ui-glass-surface', 'glass-surface');
-      node.dataset.radius = String(UI_GLASS.profile.radius);
-      node.style.borderRadius = `${UI_GLASS.profile.radius}px`;
+      const radius = node.matches('.glass-select-menu') ? 28 : UI_GLASS.profile.radius;
+      node.dataset.radius = String(radius);
+      if (node.matches('.notes-card')) {
+        node.dataset.radii = `${radius},176,${radius},${radius}`;
+        node.style.borderRadius = `${radius}px 176px ${radius}px ${radius}px`;
+      } else node.style.borderRadius = `${radius}px`;
       if (node.matches('button, a, [role="option"]')
         && !node.matches('.thumbnail, .dialog-close, .notes-close, .close-notes, .controls-toggle')
         && /[\p{L}\p{N}]/u.test(node.textContent)) node.classList.add('capsule-control');

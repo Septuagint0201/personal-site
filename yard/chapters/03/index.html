@@ -44,9 +44,10 @@
       <section id="fallback" class="fallback" hidden><h2>A moment in the shade.</h2><p id="fallback-message">This study needs WebGL 2 and graphics acceleration.</p><button id="retry" type="button">Try again</button><a href="/">All chapters ↗</a></section>
       <noscript><div class="fallback"><h2>What the sand remembers.</h2><p>Enable JavaScript to explore this interactive desert.</p><a href="/">All chapters ↗</a></div></noscript>
     </main>
-    <dialog id="notes" aria-labelledby="notes-title">
-      <form method="dialog"><button class="close-notes" aria-label="Close notes">×</button></form>
-      <p class="eyebrow">FIELD NOTES / CHAPTER 03</p>
+    <dialog id="notes" class="notes-shell" aria-labelledby="notes-title">
+      <form method="dialog"><button class="close-notes notes-detached-close" aria-label="Close notes">×</button></form>
+      <div class="notes-card"><div class="notes-scroll" tabindex="0" role="document" aria-label="Field notes content">
+<p class="eyebrow">FIELD NOTES / CHAPTER 03</p>
       <h2 id="notes-title">Nothing to hold<br /><em>it here.</em></h2>
       <div class="note-grid">
         <article><span>01</span><h3>A fragile tether</h3><p>Click to send a small impulse. Near its starting place, the crystal finds its way home. Pull it beyond the blue halo and the tether breaks.</p></article>
@@ -54,7 +55,8 @@
         <article><span>03</span><h3>A surface with memory</h3><p>Trace a groove and watch loose grains skip across the sand. Lift and retrace to cut into the next layer. The glass pushes ridges out around its impressions; steep edges settle and compressed tracks look smoother. Smooth sand clears only the ground. Start again begins a new experiment.</p></article>
       </div>
       <p class="notes-footnote">The camera stays fixed. P pushes, Space pauses, and R starts again. Interacting resumes the study. On touch screens, drag with one finger and use Hold to squeeze after release.</p>
-    </dialog>
+    </div></div>
+      </dialog>
     <script type="module" src="/src/chapter03.js"></script>
   </body>
 </html>

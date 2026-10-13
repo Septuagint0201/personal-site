@@ -31,7 +31,6 @@
 :root .chamber-settings > .capsule-control { --capsule-size: 104px; }
 :root .glass-select { min-inline-size: 0; max-inline-size: 100%; }
 :root .glass-select-trigger.capsule-control { --capsule-size: 104px; justify-content: space-between; gap: 12px; }
-:root .glass-select-option.capsule-control { --capsule-size: 100%; justify-content: space-between; gap: 12px; }
 :root .glass-select-trigger > span:first-child,
 :root .glass-select-option > span:first-child { min-inline-size: 0; overflow-wrap: anywhere; }
 :root .notes-tabs {
@@ -76,7 +75,6 @@
   :root .chamber-settings > .capsule-control,
   :root .chamber-settings .glass-select-trigger { --capsule-size: 88px; --capsule-pad: 10px; }
   :root .quality-control { padding-inline-end: 0; }
-  :root .glass-select-option.capsule-control { min-block-size: 44px; }
   :root .study-controls { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; padding: 8px 12px; }
   :root .study-controls .capsule-control { --capsule-size: 100%; --capsule-pad: 8px; min-inline-size: 0; grid-column: span 2; min-block-size: 44px; }
   :root .study-controls :is(#push, #squeeze) { --capsule-size: 100%; grid-column: span 3; }

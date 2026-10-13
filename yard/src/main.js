@@ -135,9 +135,9 @@ function chooseNotesTab(name, focus = false) {
     $(`#${button.getAttribute('aria-controls')}`).hidden = !active;
     if (active && focus) button.focus();
   });
-  help.scrollTop = 0;
+  help.querySelector('.notes-scroll').scrollTop = 0;
 }
-function openNotes(name = 'studies') { chooseNotesTab(name); help.showModal(); help.scrollTop = 0; }
+function openNotes(name = 'studies') { chooseNotesTab(name); help.showModal(); help.querySelector('.notes-scroll').scrollTop = 0; }
 $('#help-toggle').addEventListener('click', () => openNotes());
 $('#collection-toggle').addEventListener('click', () => openNotes('discoveries'));
 const tabs = [...document.querySelectorAll('[data-notes-tab]')];

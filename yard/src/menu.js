@@ -6,6 +6,7 @@ import { createGlassArrows } from "./glass-arrows.js";
 import { createViewportRingGeometry } from "./menu-orbit-geometry.js";
 import "./interaction.css";
 import { createUIGlass } from './ui-glass.js';
+import './menu-safe-area.css';
 const uiGlass = createUIGlass();
 
 const stage = document.querySelector("#card-stage");

@@ -18,6 +18,7 @@
     uniform float u_dpr;
     uniform vec4 u_rect;
     uniform float u_radius;
+    uniform vec4 u_corners; // TL, TR, BR, BL; negative selects the uniform radius.
     uniform vec4 u_material; // IOR, thickness, roughness, dispersion
     uniform float u_tint;
     uniform float u_dark;
@@ -35,7 +36,25 @@
       vec2 halfTexel = 0.5 / (u_resolution * u_dpr);
       return texture2D(u_texture, clamp(uv, halfTexel, 1.0 - halfTexel)).rgb;
     }
+    vec3 activeCorner(vec2 p, vec2 b) {
+      // Use corner regions, not quadrants: a CSS corner may exceed half-width.
+      if (p.x < -b.x + u_corners.x && p.y < -b.y + u_corners.x)
+        return vec3(-b + vec2(u_corners.x), u_corners.x);
+      if (p.x > b.x - u_corners.y && p.y < -b.y + u_corners.y)
+        return vec3(b.x - u_corners.y, -b.y + u_corners.y, u_corners.y);
+      if (p.x > b.x - u_corners.z && p.y > b.y - u_corners.z)
+        return vec3(b - vec2(u_corners.z), u_corners.z);
+      if (p.x < -b.x + u_corners.w && p.y > b.y - u_corners.w)
+        return vec3(-b.x + u_corners.w, b.y - u_corners.w, u_corners.w);
+      return vec3(0., 0., -1.);
+    }
     float roundedBox(vec2 p, vec2 halfSize, float radius) {
+      if (u_corners.x >= 0.) {
+        vec3 corner = activeCorner(p, halfSize);
+        if (corner.z >= 0.) return length(p - corner.xy) - corner.z;
+        vec2 d = abs(p) - halfSize;
+        return max(d.x, d.y);
+      }
       vec2 q = abs(p) - halfSize + radius;
       return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
     }
@@ -58,6 +77,12 @@
       return ray.xy / max(abs(ray.z), 0.15) * depth;
     }
     vec2 boxNormal(vec2 p, vec2 halfSize, float radius) {
+      if (u_corners.x >= 0.) {
+        vec3 corner = activeCorner(p, halfSize);
+        if (corner.z >= 0.) return normalize(p - corner.xy + vec2(.000001));
+        vec2 d = abs(p) - halfSize;
+        return d.x > d.y ? vec2(sign(p.x), 0.) : vec2(0., sign(p.y));
+      }
       vec2 q = abs(p) - halfSize + radius, corner = max(q, 0.0);
       float lengthCorner = length(corner);
       return lengthCorner > 0.0001 ? sign(p) * corner / lengthCorner
@@ -143,12 +168,7 @@
       float dist = roundedBox(local, halfSize, radius);
       if (dist > 1.0 / u_dpr) { gl_FragColor = vec4(original, 1.0); return; }
       // Exact rounded-box gradient avoids finite-difference corner shimmer.
-      vec2 q = abs(local) - halfSize + radius;
-      vec2 corner = max(q, 0.0);
-      float cornerLength = length(corner);
-      vec2 outward = cornerLength > 0.0001
-        ? sign(local) * corner / cornerLength
-        : (q.x > q.y ? vec2(sign(local.x), 0.0) : vec2(0.0, sign(local.y)));
+      vec2 outward = boxNormal(local, halfSize, radius);
       float bevel = min(9.0 + u_material.y * 0.32, min(halfSize.x, halfSize.y) * 0.7);
       float edge = 1.0 - clamp(-dist / max(bevel, 1.0), 0.0, 1.0);
       float slope = pow(edge, 1.7) * 2.8;
@@ -226,6 +246,12 @@
     }
   `;
 
+  function fitCornerRadii(radii, width, height) {
+    const r = radii.map(value => Number.isFinite(Number(value)) ? Math.max(0, Number(value)) : 0);
+    const scale = Math.min(1, width / Math.max(1, r[0] + r[1]), width / Math.max(1, r[3] + r[2]),
+      height / Math.max(1, r[0] + r[3]), height / Math.max(1, r[1] + r[2]));
+    return r.map(value => value * scale);
+  }
   class GlassRenderer {
     constructor(element, options) {
       this.element = element;
@@ -319,6 +345,7 @@
           "dpr",
           "rect",
           "radius",
+          "corners",
           "material",
           "tint",
           "dark",
@@ -631,6 +658,10 @@
         );
         const scale = rect.width / (surface.offsetWidth || rect.width);
         gl.uniform1f(u.radius, (+surface.dataset.radius || 14) * scale);
+        const corners = surface.dataset.radii?.split(',');
+        const fitted = corners?.length === 4
+          ? fitCornerRadii(corners.map(value => Number(value) * scale), rect.width, rect.height) : [-1, -1, -1, -1];
+        gl.uniform4f(u.corners, ...fitted);
         const effects = this.options.getSurfaceEffects?.(surface) || {};
         gl.uniform3f(u.surface, effects.reflection ?? 1, effects.hover ?? 0, effects.interactive ? 1 : 0);
         gl.uniform4f(
@@ -669,6 +700,7 @@
 
   window.LiquidGlass = Object.freeze({
     Renderer: GlassRenderer,
+    fitCornerRadii,
     softCurve: Object.freeze(softCurve),
   });
 })();

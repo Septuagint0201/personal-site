@@ -56,7 +56,7 @@ export function createGlassSelect(select, { theme = 'sand', onOpen = () => {} } 
   function position() {
     if (!opened) return;
     const rect = trigger.getBoundingClientRect(), gap = 9, margin = 12;
-    const width = Math.min(Math.max(148, rect.width), win.innerWidth - margin * 2);
+    const width = Math.min(Math.max(184, rect.width), win.innerWidth - margin * 2);
     menu.style.width = `${width}px`; menu.style.maxHeight = '240px';
     const naturalHeight = menu.scrollHeight + 2;
     const above = rect.top - gap - margin, below = win.innerHeight - rect.bottom - gap - margin;

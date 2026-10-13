@@ -282,6 +282,7 @@ function setNotesTab(id) {
     $(`#${name}-tab`).tabIndex = active ? 0 : -1;
     $(`#${name}-panel`).hidden = !active;
   }
+  notes.querySelector('.notes-scroll').scrollTop = 0;
 }
 function openNotes(tab = "about") {
   pointerLock?.release();
