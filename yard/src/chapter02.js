@@ -4,6 +4,8 @@ import { createLiquidDiscoveries } from "./liquid-discoveries.js";
 import { createLiquidPointerLock } from "./liquid-pointer-lock.js";
 import { createGlassSelect } from "./glass-select.js";
 import "./glass-select.css";
+import { createUIGlass } from './ui-glass.js';
+const uiGlass = createUIGlass({ dark: true });
 
 const $ = (selector) => document.querySelector(selector);
 const canvas = $("#liquid-canvas"),
@@ -194,6 +196,7 @@ function initialize() {
   loading.classList.remove("is-ready");
   try {
     renderer = createLiquidRenderer(canvas, {
+      onFrame: uiGlass.capture,
       onPreparing() {
         clearTimeout(loadingTimeout);
         gallery.dataset.renderer = "preparing";

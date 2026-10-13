@@ -3,6 +3,8 @@ import './interaction.css';
 import './glass-select.css';
 import { createGlassSelect } from './glass-select.js';
 import { createDesertScene } from './chapter03-scene.js';
+import { createUIGlass } from './ui-glass.js';
+const uiGlass = createUIGlass();
 const $ = selector => document.querySelector(selector);
 const stage = $('#desert-stage'), study = $('#desert-study'), notes = $('#notes');
 let scene, paused = false, announcementTimer, readyTimer, lastPhase;
@@ -34,6 +36,7 @@ function status(state) {
 }
 try {
   scene = createDesertScene(stage, {
+    onFrame: uiGlass.capture,
     onStatus: status,
     onDetach: () => announce('It lets go. Drag to stretch the glass; hold Squeeze to press it flat.'),
     onReturn: () => announce('The desert gives it back.'),

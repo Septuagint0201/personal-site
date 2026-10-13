@@ -67,6 +67,7 @@ export function createLiquidRenderer(
     onStatus,
     onEvent,
     onTarget,
+    onFrame,
   } = {},
 ) {
   const gl = canvas.getContext("webgl2", {
@@ -670,6 +671,7 @@ export function createLiquidRenderer(
       gl.uniform1i(resolve.uniforms[name], 2 + i);
     });
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+    onFrame?.(canvas);
     frames++;
     if (!sampleStarted) sampleStarted = now;
     if (now - sampleStarted > 2500) {

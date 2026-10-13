@@ -1,3 +1,4 @@
+import { UI_GLASS_GLSL } from './ui-glass-optics.js';
 /*
  * A shared procedural gallery viewed through thick, bevelled crystal cards.
  * The cards use screen-space Snell refraction, spectral IOR and Beer absorption;
@@ -26,6 +27,7 @@ uniform float time;
 uniform float radius;
 uniform float surface;
 uniform float accent;
+uniform sampler2D scene;
 
 float squared(float v) { return v * v; }
 float line(float d, float width) { return 1. - smoothstep(width, width + 1.25, abs(d)); }
@@ -111,12 +113,10 @@ float roundedBox(vec2 p, vec2 halfSize, float r) {
   return length(max(q, 0.)) + min(max(q.x, q.y), 0.) - r;
 }
 
-vec2 refraction(vec3 normal, float ior, float depth) {
-  vec3 incident = normalize(vec3(tilt * .045, -1.));
-  vec3 ray = refract(incident, normal, 1. / ior);
-  return ray.xy / max(abs(ray.z), .18) * depth;
-}
-
+float uiDistance(vec2 p);
+vec3 uiSampleScene(vec2 p){return texture2D(scene,clamp(vec2(p.x/viewport.x,1.-p.y/viewport.y),vec2(.001),vec2(.999))).rgb;}
+${UI_GLASS_GLSL}
+float uiDistance(vec2 p){return roundedBox(p,size*.5-1.,min(uiRadius,min(size.x,size.y)*.5-1.));}
 void main() {
   vec2 localUV = vec2(uv.x, 1. - uv.y);
   vec2 pixel = bounds.xy + localUV * bounds.zw;
@@ -127,7 +127,7 @@ void main() {
 
   vec2 local = localUV * size;
   vec2 p = local - size * .5;
-  float r = min(radius, min(size.x, size.y) * .25);
+  float r = min(uiRadius, min(size.x, size.y) * .5-1.);
   float d = roundedBox(p, size * .5 - 1., r);
   float alpha = 1. - smoothstep(-.6, .9, d);
   if (alpha < .005) { gl_FragColor = vec4(0.); return; }
@@ -136,35 +136,16 @@ void main() {
     roundedBox(p + vec2(0., .6), size * .5 - 1., r) - roundedBox(p - vec2(0., .6), size * .5 - 1., r)
   ) + vec2(.00001));
 
-  float inward = max(-d, 0.);
-  // The homepage's polished strata reflection and smooth C2 shoulder are used
-  // together here: a continuous lens cap, not a stack of painted white borders.
-  float depth = 60.;
-  float bevel = min(9. + depth * .32, min(size.x, size.y) * .35);
-  float referenceWidth = min(bevel * 1.75, min(size.x, size.y) * .46);
-  float width = min(bevel * 2.4, min(size.x, size.y) * .485);
-  float t = clamp(inward / max(width, 1.), 0., 1.);
-  float widthRatio = width / max(referenceWidth, .001);
-  float b = 1. / (1.1 * widthRatio * (1. + 1. / .85) - 1.);
-  float q = (1. + b) * t / (t + b);
-  float tail = max(1. - q, 0.);
-  float height = 1. - tail * tail * tail;
-  float derivative = 3. * tail * tail * b * (1. + b) / squared(t + b);
-  float slope = depth * .82 * derivative / max(width, 1.);
-  vec3 normal = normalize(vec3(gradient * slope, 1.));
-  float thickness = depth * (.18 + .82 * height);
-
-  vec2 red = refraction(normal, 1.41, thickness);
-  vec2 green = refraction(normal, 1.48, thickness);
-  vec2 blue = refraction(normal, 1.55, thickness);
-  // Sampling the same gallery makes the line displacement visible through every slab.
-  vec3 transmitted = vec3(gallery(pixel + red).r, gallery(pixel + green).g, gallery(pixel + blue).b);
-  vec3 glassTint = accent > 1.5 ? vec3(.89, .99, .94) :
-    mix(vec3(.94, .986, 1.), vec3(1., .915, .88), accent);
-  transmitted *= pow(glassTint, vec3(.55 + tail * 1.1));
+  float width=min(uiShoulder,min(size.x,size.y)*.49);
+  vec2 curve=uiCurve(d,width);
+  float tail=1.-clamp(-d/width,0.,1.);
+  vec3 normal=normalize(vec3(gradient*uiThickness*uiFront*curve.y,1.));
+  vec3 transmitted=uiTransmission(pixel,p,size*.5,width,bounds.zw/size,0.);
+  transmitted=mix(transmitted,vec3(.045,.062,.086),uiTintAmount(0.));
   vec3 incident = normalize(vec3(tilt * .045, -1.));
   vec3 reflected = reflect(incident, normal);
-  float fresnel = .04 + .96 * pow(1. - max(dot(-incident, normal), 0.), 5.);
+  float f0=pow((uiIOR-1.)/(uiIOR+1.),2.);
+  float fresnel = f0 + (1.-f0) * pow(1. - max(dot(-incident, normal), 0.), 5.);
   float softbox = exp(-squared((reflected.x + reflected.y * .65 - .35) * 3.4));
   float strip = exp(-squared((reflected.x - reflected.y * .3 + .55) * 15.));
   vec2 reflectedPixel = pixel + reflected.xy * viewport * .3 + vec2(0., -viewport.y * .15);
@@ -230,6 +211,7 @@ function createPass(canvas, isSurface) {
     gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
     const uniforms = Object.fromEntries(
       [
+        "scene",
         "viewport",
         "size",
         "bounds",
@@ -244,7 +226,14 @@ function createPass(canvas, isSurface) {
     gl.uniform1f(uniforms.surface, isSurface ? 1 : 0);
     gl.deleteShader(vertex);
     gl.deleteShader(fragment);
-    return { gl, program, buffer, uniforms, canvas, lost: false };
+    const texture=gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D,texture);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,255]));
+    return { gl, program, buffer, uniforms, canvas, texture, textureWidth: 0, textureHeight: 0, lost: false };
   } catch (error) {
     if (vertex) gl.deleteShader(vertex);
     if (fragment) gl.deleteShader(fragment);
@@ -370,6 +359,14 @@ export function createMenuGlass({
             element.dataset?.accent === "amber"
           ? 1
           : 0;
+    if(isSurface){
+      gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,entry.texture);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+      if(entry.textureWidth===background.width&&entry.textureHeight===background.height)
+        gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,gl.RGBA,gl.UNSIGNED_BYTE,background);
+      else {gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,background);entry.textureWidth=background.width;entry.textureHeight=background.height;}
+      gl.uniform1i(uniforms.scene,0);
+    }
     gl.viewport(0, 0, pixelWidth, pixelHeight);
     gl.uniform2f(uniforms.viewport, innerWidth, innerHeight);
     gl.uniform2f(uniforms.size, width, height);
@@ -478,6 +475,7 @@ export function createMenuGlass({
       for (const entry of entries) {
         entry.gl.deleteProgram(entry.program);
         entry.gl.deleteBuffer(entry.buffer);
+        entry.gl.deleteTexture(entry.texture);
       }
     },
   };

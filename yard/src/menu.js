@@ -5,6 +5,8 @@ import { createRingScroll } from "./ring-scroll.js";
 import { createGlassArrows } from "./glass-arrows.js";
 import { createViewportRingGeometry } from "./menu-orbit-geometry.js";
 import "./interaction.css";
+import { createUIGlass } from './ui-glass.js';
+const uiGlass = createUIGlass();
 
 const stage = document.querySelector("#card-stage");
 const stack = document.querySelector("#cards");
@@ -58,7 +60,7 @@ const glassArrows = createGlassArrows({
 });
 const glass = createMenuGlass({
   background: document.querySelector("#glass-world"),
-  onRender: () => glassArrows.render(),
+  onRender: () => { glassArrows.render(); uiGlass.capture(document.querySelector('#glass-world')); },
   surfaces: cards.map((element) => ({
     element,
     canvas: element.querySelector("canvas"),

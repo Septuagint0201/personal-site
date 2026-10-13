@@ -12,7 +12,7 @@ import { createFramePacer } from './frame-pacing.js';
 const clamp = THREE.MathUtils.clamp;
 export const DESERT_CAMERA_PITCH = 30;
 
-export function createDesertScene(stage, { onStatus = () => {}, onDetach = () => {}, onReturn = () => {}, onError = () => {} } = {}) {
+export function createDesertScene(stage, { onStatus = () => {}, onDetach = () => {}, onReturn = () => {}, onError = () => {}, onFrame } = {}) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -405,6 +405,7 @@ export function createDesertScene(stage, { onStatus = () => {}, onDetach = () =>
     }
     groundUniforms.sandClock.value = time;
     renderer.render(scene, camera);
+    onFrame?.(renderer.domElement);
     if (now - statusAt > 160) {
       onStatus({ phase: physics.phase, distance: physics.distance, volumeRatio: physics.volumeRatio,
         contacts: physics.contacts, marks: sand.revision, paused, quality });

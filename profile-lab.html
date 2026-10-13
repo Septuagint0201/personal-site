@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#f3f2ed" />
   <title>Thickness Lab · Septuagint</title>
-  <link rel="stylesheet" href="profile-lab.css?v=1" />
-  <script type="module" src="profile-lab.js?v=1"></script>
+  <link rel="stylesheet" href="profile-lab.css?v=2" />
+  <script type="module" src="profile-lab.js?v=2"></script>
 </head>
 <body>
   <header><a class="brand" href="glass-lab.html">S<span>✦</span> <b>SEPTUAGINT <small>/ THICKNESS LAB</small></b></a><nav><a href="glass-lab.html">材质 Lab ↗</a><a href="index.html">主页 ↗</a></nav></header>
@@ -15,7 +15,7 @@
     <div class="workspace">
       <div class="studies">
         <section class="preview-panel panel" aria-label="玻璃形体与折射预览">
-          <div class="toolbar"><div class="segmented" id="view-modes"><button data-view="glass" aria-pressed="true">玻璃折射</button><button data-view="solid" aria-pressed="false">实体形体</button></div><div class="toolbar-actions"><button id="front-view">正视</button><button id="perspective-view">立体</button><button id="compare" aria-pressed="false">参考对比</button></div></div>
+          <div class="toolbar"><div class="segmented" id="view-modes"><button data-view="glass" aria-pressed="true">玻璃折射</button><button data-view="solid" aria-pressed="false">实体形体</button></div><div class="toolbar-actions"><button id="front-view">正视</button><button id="back-view">背视</button><button id="perspective-view">立体</button><button id="compare" aria-pressed="false">参考对比</button></div></div>
           <div id="viewport" class="viewport"><canvas id="glass-view" tabindex="0" aria-label="玻璃立体预览。拖动旋转，方向键旋转，Home 回正。"></canvas><span class="pane-label reference-label" hidden>REFERENCE / 已固定</span><span class="pane-label current-label">LIVE / 当前曲线</span><div id="render-fallback" hidden>此预览需要 WebGL 2。曲线编辑与参数导出仍可使用。</div><p class="gesture">拖动旋转 · 方向键微调 · Home 回正</p></div>
           <div class="preview-footer"><div class="segmented" id="backgrounds"><button data-background="chart" aria-pressed="true">校准图</button><button data-background="light" aria-pressed="false">光带</button><button data-background="photo" aria-pressed="false">插画</button></div><span id="dimension-reading"></span></div>
         </section>
@@ -31,19 +31,20 @@
           </svg>
           <div class="curve-readings"><span>外缘厚度 <b id="edge-reading"></b></span><span>中央厚度 <b id="center-reading"></b></span><span>有效过渡 <b id="shoulder-reading"></b></span></div>
         </section>
-        <section class="section-panel panel" aria-labelledby="section-title"><div class="section-top"><div><p class="eyebrow">02 / PHYSICAL SECTION</p><h2 id="section-title">实际厚度截面</h2></div><span id="section-scale"></span></div><svg id="section-view" viewBox="0 0 640 210" role="img" aria-label="同尺度下的玻璃实体横截面"><path id="section-reference" class="section-reference"/><path id="section-solid"/><path id="section-midline"/><g id="section-dimensions"/></svg><p class="section-copy">水平与垂直采用同一比例，展示实际形状；正背面分配会改变两侧曲率。</p></section>
+        <section class="section-panel panel" aria-labelledby="section-title"><div class="section-top"><div><p class="eyebrow">02 / PHYSICAL SECTION</p><h2 id="section-title">实际厚度截面</h2></div><span id="section-scale"></span></div><svg id="section-view" viewBox="0 0 640 210" role="img" aria-label="同尺度下的玻璃实体横截面"><path id="section-reference" class="section-reference"/><path id="section-solid"/><path id="section-midline"/><g id="section-dimensions"/></svg><p class="section-copy" id="section-face-reading">水平与垂直采用同一比例，展示实际形状；正背面分配会改变两侧曲率。</p></section>
       </div>
       <aside class="controls panel" aria-label="厚度与光学参数">
-        <div class="section-top"><div><p class="eyebrow">TUNE / A COMMON MATERIAL</p><h2>同一套玻璃</h2></div><button id="reset" title="恢复当前主页参考">↺ 重置</button></div>
+        <div class="section-top"><div><p class="eyebrow">TUNE / A COMMON MATERIAL</p><h2>同一套玻璃</h2></div><button id="reset" title="恢复初始双曲参考">↺ 重置</button></div>
         <label class="select-label" for="preset">起始截面</label><select id="preset"><option value="current">当前双曲 · 参考起点</option><option value="crystal">水晶厚肩</option><option value="lens">柔和透镜</option><option value="prism">棱角平台</option><option value="custom" disabled>自定义曲线</option></select>
         <fieldset><legend>形状与尺寸</legend><div id="shapes" class="shape-buttons"><button data-shape="card" aria-pressed="true">▱<span>卡片</span></button><button data-shape="pill" aria-pressed="false">▰<span>胶囊</span></button><button data-shape="circle" aria-pressed="false">○<span>圆形</span></button><button data-shape="triangle" aria-pressed="false">△<span>三角形</span></button></div><div id="geometry-controls"></div></fieldset>
-        <fieldset><legend>厚度轮廓</legend><div id="profile-controls"></div><div id="hyperbolic-controls"></div><div id="bezier-controls" hidden></div><label class="check"><input type="checkbox" id="flat-join" checked /> Bézier 尾端水平接入平面</label></fieldset>
+        <fieldset><legend>厚度轮廓</legend><div id="profile-controls"></div>
+          <div class="face-choice"><span class="select-label" id="face-title">表面形态</span><div class="segmented face-modes" role="group" aria-labelledby="face-title"><button data-face="double" aria-pressed="true">双面曲面</button><button data-face="back-flat" aria-pressed="false">正曲 · 背平</button><button data-face="front-flat" aria-pressed="false">正平 · 背曲</button></div><p class="small-note" id="face-reading" aria-live="polite"></p></div><div id="face-controls"></div><div id="hyperbolic-controls"></div><div id="bezier-controls" hidden></div><label class="check"><input type="checkbox" id="flat-join" checked /> Bézier 尾端水平接入平面</label></fieldset>
         <fieldset><legend>光学压力测试</legend><div id="optical-controls"></div><p id="spectrum-reading" class="small-note"></p><p class="small-note">高折射率与高色散用于探索。RGB 色散采用 n−Δn / n / n+Δn，红通道最低为 1.001。</p></fieldset>
         <div class="actions"><button id="pin-reference">固定为参考</button><button id="save-local">保存本机</button><button id="export" class="primary">导出统一参数 ↗</button><button id="import">导入参数</button><input type="file" id="import-file" accept=".json,application/json" hidden /></div>
         <p id="status" class="status" role="status" aria-live="polite">仅在这个 Lab 中调整，尚未应用到站点 UI。</p>
       </aside>
     </div>
-    <details class="method"><summary>关于形体、光学和参数统一 <span>＋</span></summary><p>曲线决定从外缘到内部的厚度，而非只改变高光。截面和立体预览读取同一个归一化轮廓；宽度不足的小控件会缩短肩部过渡，厚度保持设定值。Bézier 拖点限制为单调曲线，避免表面翻折。</p><p>光学预览基于闭合玻璃体的界面求交、Snell 折射和 Fresnel 反射，包含有限次数的全内反射处理；并非完整多反弹路径追踪。极窄肩部和高折射率下可切换实体形体检查边界。导出的 v1 JSON 包含尺寸、轮廓、光学参数及采样表，可作为其他 UI 渲染器接入统一材质的依据。</p></details>
+    <details class="method"><summary>关于形体、光学和参数统一 <span>＋</span></summary><p>曲线决定从外缘到内部的厚度，而非只改变高光。截面和立体预览读取同一个归一化轮廓；宽度不足的小控件会缩短肩部过渡，厚度保持设定值。Bézier 拖点限制为单调曲线，避免表面翻折。</p><p>光学预览基于闭合玻璃体的界面求交、Snell 折射和 Fresnel 反射，包含有限次数的全内反射处理；并非完整多反弹路径追踪。极窄肩部和高折射率下可切换实体形体检查边界。单面模式令正面或背面全程保持平面，另一面承担完整厚度曲线；正背面视图、实体、折射和导出共用同一形体。导出的 v1 JSON 包含尺寸、轮廓、光学参数及采样表，可作为其他 UI 渲染器接入统一材质的依据。</p></details>
   </main>
   <footer>SEPTUAGINT <span>✦</span> MATERIAL / SHAPE / LIGHT</footer>
 </body>

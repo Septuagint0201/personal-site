@@ -1,13 +1,30 @@
-/* Homepage material approved in septuagint-glass-liquid (1).json. */
+/* Approved B interface glass, shared with YARD; local A/B snapshots retained. */
 "use strict";
 (() => {
-  const chosenMaterial = Object.freeze({
-    ior: 1.7,
-    thickness: 60,
-    roughness: 1.5,
-    dispersion: 0.12,
-    tint: 0.15,
+  const acceptedMaterial = window.SiteGlassPreset.material;
+  // Captured from the user's active local Thickness Lab. Keep layout dimensions;
+  // the radius and shoulder adapt to each control's available inradius.
+  const acceptedProfile = window.SiteGlassPreset.profile;
+  // Local snapshots only: both previews retain the accepted haze and tint.
+  const comparisonProfiles = Object.freeze({
+    double: { label: 'A · 双面曲面',
+      material: Object.freeze({ ...acceptedMaterial, thickness: 4, ior: 1.57, dispersion: 0.15 }),
+      profile: Object.freeze({ ...acceptedProfile, front: 0.5 }) },
+    single: { label: 'B · 正曲背平',
+      material: Object.freeze({ ...acceptedMaterial, thickness: 6, ior: 1.45, dispersion: 0.10 }),
+      profile: Object.freeze({ ...acceptedProfile, front: 1 }) },
   });
+  const comparisonQuery = new URLSearchParams(location.search).get('glass');
+  const localComparison = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
+    && Object.hasOwn(comparisonProfiles, comparisonQuery);
+  const initialProfile = localComparison ? comparisonProfiles[comparisonQuery]
+    : { material: acceptedMaterial, profile: acceptedProfile };
+  let chosenMaterial = initialProfile.material;
+  let chosenProfile = initialProfile.profile;
+  for (const surface of document.querySelectorAll('.glass-surface')) {
+    surface.dataset.radius = String(chosenProfile.radius);
+    surface.style.borderRadius = `${chosenProfile.radius}px`;
+  }
   const systemTheme = matchMedia("(prefers-color-scheme: light)");
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
   const themeButton = document.getElementById("themeToggle");
@@ -130,7 +147,8 @@
   scene.dataset.depthPreset = "strata";
   function paintBackground(ctx, width, height) {
     prepareParticles(width, height);
-    background.paint(ctx, width, height, { ...chosenBackground, dark, composition: 1, maxDpr: 2, focus: readingBounds }, camera);
+    background.paint(ctx, width, height, { ...chosenBackground, dark, composition: 1, maxDpr: 2,
+      profile: chosenProfile, material: chosenMaterial, focus: readingBounds }, camera);
     const color = dark ? "219,212,249" : "88,79,124";
     for (let i = 0; i < particles.length; i++) {
       const particle = particles[i];
@@ -277,6 +295,7 @@
       }),
       getState: () => ({
         material: chosenMaterial,
+        profile: chosenProfile,
         dark,
         invertedTint: true,
         edgeProfile: "soft",
@@ -295,11 +314,39 @@
     renderer.resize();
     startAnimation();
   }
+  if (localComparison) {
+    document.body.classList.add('glass-comparing');
+    const panel = document.createElement('aside');
+    panel.id = 'glass-comparison';
+    panel.setAttribute('aria-label', '本地玻璃 A/B 对比');
+    panel.innerHTML = `<div role="group" aria-label="选择玻璃版本"><button type="button" data-glass-version="double">A · 双面曲面</button><button type="button" data-glass-version="single">B · 正曲背平</button></div><output aria-live="polite"></output>`;
+    document.body.append(panel);
+    function selectComparison(key) {
+      const selected = comparisonProfiles[key];
+      chosenMaterial = selected.material;
+      chosenProfile = selected.profile;
+      for (const button of panel.querySelectorAll('button'))
+        button.setAttribute('aria-pressed', String(button.dataset.glassVersion === key));
+      panel.querySelector('output').textContent = `${chosenMaterial.thickness}px · n ${chosenMaterial.ior.toFixed(2)} · Δn ${chosenMaterial.dispersion.toFixed(2)} · 模糊 / 底色相同`;
+      document.title = `${selected.label} · Septuagint`;
+      const url = new URL(location.href);
+      url.searchParams.set('glass', key);
+      history.replaceState(null, '', url);
+      renderer?.refreshBackground();
+    }
+    panel.addEventListener('click', event => {
+      const button = event.target.closest('button[data-glass-version]');
+      if (button) selectComparison(button.dataset.glassVersion);
+    });
+    selectComparison(comparisonQuery);
+  }
   let lastPointerUpdate = 0;
   window.addEventListener(
     "pointermove",
     (event) => {
       if (event.pointerType === "touch" || reducedMotion.matches) return;
+      // Comparing materials should not also move the scene camera or light.
+      if (localComparison && event.target.closest?.('#glass-comparison')) return;
       if (pointer.x === null) {
         lens.x = event.clientX;
         lens.y = event.clientY;

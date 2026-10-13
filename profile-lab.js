@@ -5,10 +5,12 @@ const $ = id => document.getElementById(id), storageKey = 'septuagint-thickness-
 let state = { ...DEFAULT_PROFILE }, reference = { ...DEFAULT_PROFILE }, settings = { view: 'glass', background: 'chart', compare: false };
 let renderer, frame = 0, drag = null, objectDrag = null;
 try { const saved=localStorage.getItem(storageKey); if(saved)state=importProfile(JSON.parse(saved)); } catch { /* Invalid older choices do not replace the baseline. */ }
+let doubleFront = .5;
+const faceMode = () => state.front === 1 ? 'back-flat' : state.front === 0 ? 'front-flat' : 'double';
 const specs = [
   ['geometry-controls','width','宽度','px',1,1],['geometry-controls','height','高度','px',1,1],['geometry-controls','radius','圆角半径','px',1,1],
   ['profile-controls','thickness','中央总厚度','px',1,1],['profile-controls','shoulder','肩部过渡宽度','px',.1,1],
-  ['profile-controls','edge','外缘保留厚度','%',1,100],['profile-controls','front','正面厚度占比','%',1,100],
+  ['profile-controls','edge','外缘保留厚度','%',1,100],['face-controls','front','正面厚度占比','%',1,100],
   ['hyperbolic-controls','bias','双曲偏置','',.01,1],['hyperbolic-controls','exponent','收平阶数','',.1,1],
   ['bezier-controls','x1','控制点 1 · 水平位置','',.01,1],['bezier-controls','y1','控制点 1 · 高度','',.01,1],
   ['bezier-controls','x2','控制点 2 · 水平位置','',.01,1],['bezier-controls','y2','控制点 2 · 高度','',.01,1],
@@ -26,9 +28,11 @@ for(const [parent,key,label,unit,step,multiplier] of specs){
 function announce(message){$('status').textContent=message;}
 function changed(){ $('preset').value='custom';sync();request(); }
 function sync(){
+  const face = faceMode();
+  if (face === 'double') doubleFront = state.front;
   for(const [key,{range,number,multiplier,row}] of inputs){
     const value=Number((state[key]*multiplier).toFixed(3));range.value=number.value=String(value);
-    const disabled=(key==='height'&&state.shape==='circle')||(key==='radius'&&['circle','pill'].includes(state.shape))||(key==='y2'&&$('flat-join').checked);
+    const disabled=(key==='height'&&state.shape==='circle')||(key==='radius'&&['circle','pill'].includes(state.shape))||(key==='y2'&&$('flat-join').checked)||(key==='front'&&face!=='double');
     range.disabled=number.disabled=disabled;row.style.opacity=disabled?'.45':'1';
   }
   $('hyperbolic-controls').hidden=state.kind!=='hyperbolic';$('bezier-controls').hidden=state.kind!=='bezier';
@@ -37,6 +41,12 @@ function sync(){
   $('flat-join').disabled=state.kind!=='bezier';
   $('curve-hint').textContent=state.kind==='bezier'?'拖动两个圆点调节；方向键微调，Shift 加快。虚线为固定参考。':'从玻璃外缘到内部平面。调节偏置与收平阶数，或切换 Bézier 直接拖点。';
   for(const button of document.querySelectorAll('[data-shape]'))button.setAttribute('aria-pressed',String(button.dataset.shape===state.shape));
+  for(const button of document.querySelectorAll('[data-face]'))button.setAttribute('aria-pressed',String(button.dataset.face===face));
+  const faceCopy = face === 'double' ? '厚度分配到正背两侧，分别形成曲面。'
+    : face === 'back-flat' ? '背面整面为平面；全部厚度与曲率位于正面。'
+    : '正面整面为平面；全部厚度与曲率位于背面。';
+  $('face-reading').textContent = `${faceCopy} 切换保留中央厚度、肩宽和曲线。`;
+  $('section-face-reading').textContent = `水平与垂直采用同一比例。${faceCopy}`;
   const d=dimensions(state),rgb=spectrum(state);
   $('dimension-reading').textContent=`${d.width.toFixed(0)} × ${d.height.toFixed(0)} × ${state.thickness.toFixed(1)} px`;
   $('edge-reading').textContent=`${(state.edge*state.thickness).toFixed(1)} px / ${(state.edge*100).toFixed(0)}%`;
@@ -88,6 +98,10 @@ for(let index=1;index<=2;index++){
 }
 $('edit-bezier').addEventListener('click',()=>{state.kind=state.kind==='bezier'?'hyperbolic':'bezier';if(state.kind==='bezier'&&$('flat-join').checked)state.y2=1;changed();});
 $('flat-join').addEventListener('change',()=>{if($('flat-join').checked)state.y2=1;changed();});
+for(const button of document.querySelectorAll('[data-face]'))button.addEventListener('click',()=>{
+  state.front = button.dataset.face === 'back-flat' ? 1 : button.dataset.face === 'front-flat' ? 0 : doubleFront;
+  changed();
+});
 const presets={current:{...DEFAULT_PROFILE},crystal:{...DEFAULT_PROFILE,kind:'bezier',x1:.08,y1:.65,x2:.42,y2:1,thickness:72,shoulder:52,edge:.12,ior:1.9,dispersion:.22},lens:{...DEFAULT_PROFILE,kind:'bezier',x1:.25,y1:.2,x2:.65,y2:1,thickness:48,shoulder:80,edge:.04,ior:1.65,dispersion:.06},prism:{...DEFAULT_PROFILE,kind:'bezier',x1:.03,y1:.88,x2:.18,y2:1,thickness:90,shoulder:32,edge:.32,ior:2.3,dispersion:.35}};
 $('preset').addEventListener('change',event=>{if(!presets[event.target.value])return;state={...presets[event.target.value]};$('flat-join').checked=state.y2===1;sync();request();});
 for(const button of document.querySelectorAll('[data-shape]'))button.addEventListener('click',()=>{
@@ -99,7 +113,7 @@ for(const button of document.querySelectorAll('[data-background]'))button.addEve
 function compare(){ $('compare').setAttribute('aria-pressed',String(settings.compare));$('viewport').classList.toggle('comparing',settings.compare);document.querySelector('.reference-label').hidden=!settings.compare;request(); }
 $('compare').addEventListener('click',()=>{settings.compare=!settings.compare;compare();});
 $('pin-reference').addEventListener('click',()=>{reference={...state};settings.compare=true;compare();announce('已固定当前曲线与形体。右侧继续调整，左侧保持参考。');});
-$('reset').addEventListener('click',()=>{state={...DEFAULT_PROFILE};$('flat-join').checked=true;$('preset').value='current';sync();request();announce('已恢复主页参数起点，本机保存的选择仍保留。');});
+$('reset').addEventListener('click',()=>{state={...DEFAULT_PROFILE};$('flat-join').checked=true;$('preset').value='current';sync();request();announce('已恢复初始双曲参数，本机保存的选择仍保留。');});
 $('save-local').addEventListener('click',()=>{try{localStorage.setItem(storageKey,JSON.stringify(exportProfile(state)));announce('已保存到本机，仅供这个 Lab 下次恢复。');}catch{announce('浏览器无法保存本机设置，请使用导出参数。');}});
 $('export').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(exportProfile(state),null,2)+'\n'],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='septuagint-ui-glass-profile.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);announce('已导出统一参数，包含形状、厚度曲线、RGB 折射率和采样表。');});
 $('import').addEventListener('click',()=>$('import-file').click());
@@ -110,7 +124,7 @@ canvas.addEventListener('pointerdown',event=>{if(event.button!==0||!event.isPrim
 canvas.addEventListener('pointermove',event=>{if(objectDrag?.id!==event.pointerId)return;renderer.rotate(objectDrag.rotation[0]+(event.clientX-objectDrag.x)*.006,objectDrag.rotation[1]+(event.clientY-objectDrag.y)*.006);});
 for(const type of ['pointerup','pointercancel','lostpointercapture'])canvas.addEventListener(type,event=>{if(objectDrag?.id===event.pointerId)objectDrag=null;});
 canvas.addEventListener('keydown',event=>{if(!renderer)return;const [y,p]=renderer.rotation,delta={ArrowLeft:[-.04,0],ArrowRight:[.04,0],ArrowUp:[0,-.04],ArrowDown:[0,.04]}[event.key];if(event.key==='Home'){event.preventDefault();renderer.rotate(0,0);}else if(delta){event.preventDefault();renderer.rotate(y+delta[0],p+delta[1]);}});
-$('front-view').addEventListener('click',()=>renderer?.rotate(0,0));$('perspective-view').addEventListener('click',()=>renderer?.rotate(-.34,.28));
+$('front-view').addEventListener('click',()=>renderer?.rotate(0,0));$('back-view').addEventListener('click',()=>renderer?.rotate(Math.PI,0));$('perspective-view').addEventListener('click',()=>renderer?.rotate(-.34,.28));
 window.addEventListener('blur',()=>{drag=objectDrag=null;});
 window.addEventListener('pagehide',event=>{if(!event.persisted){cancelAnimationFrame(frame);renderer?.dispose();}});
 $('flat-join').checked=state.y2===1;if(JSON.stringify(state)!==JSON.stringify(DEFAULT_PROFILE))$('preset').value='custom';sync();request();

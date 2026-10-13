@@ -1,3 +1,4 @@
+import { UI_GLASS_GLSL } from './ui-glass-optics.js';
 // Same C2 shoulder, IOR and dispersion as the approved Candy glass preset.
 // The texture is the live render immediately behind these DOM controls.
 const vertex = `attribute vec2 position; void main(){gl_Position=vec4(position,0.,1.);}`;
@@ -15,7 +16,9 @@ float triangle(vec2 p){
   return -length(q)*sign(q.y)-2.3;
 }
 vec3 sampleScene(vec2 p){return texture2D(scene,clamp((p-sourceRect.xy)/sourceRect.zw,vec2(.001),vec2(.999))).rgb;}
-vec2 ray(vec3 normal,float ior,float depth){vec3 r=refract(vec3(0.,0.,-1.),normal,1./ior);return r.xy/max(abs(r.z),.15)*depth;}
+float uiDistance(vec2 p){return triangle(p);}
+vec3 uiSampleScene(vec2 p){return sampleScene(p);}
+${UI_GLASS_GLSL}
 void main(){
   vec2 uv=gl_FragCoord.xy/resolution;
   vec2 local=(uv-.5)*cssSize;
@@ -23,22 +26,14 @@ void main(){
   float coverage=1.-smoothstep(-.65,.65,d);
   if(coverage<.001){gl_FragColor=vec4(0.);return;}
   vec2 gradient=normalize(vec2(triangle(local+vec2(.25,0.))-triangle(local-vec2(.25,0.)),triangle(local+vec2(0.,.25))-triangle(local-vec2(0.,.25)))+vec2(.00001));
-  float width=min(cssSize.x,cssSize.y)*.21;
-  float t=clamp(-d/width,0.,1.);
-  float b=.49;
-  float q=(1.+b)*t/(t+b),tail=max(1.-q,0.);
-  float height=1.-tail*tail*tail;
-  float derivative=3.*tail*tail*b*(1.+b)/((t+b)*(t+b));
-  float thickness=60.;
-  vec3 n=normalize(vec3(gradient*thickness*.82*derivative/width,1.));
+  float width=min(uiShoulder,(min(cssSize.x,cssSize.y)*.325/1.7320508+2.3)*.98);
+  vec2 curve=uiCurve(d,width);
+  float tail=1.-clamp(-d/width,0.,1.);
+  vec3 n=normalize(vec3(gradient*uiThickness*uiFront*curve.y,1.));
   vec2 p=bounds.xy+vec2(uv.x,1.-uv.y)*bounds.zw;
-  float depth=thickness*(.18+.82*height);
-  vec2 g=ray(n,1.70,depth)*vec2(1.,-1.);
-  vec2 r=ray(n,1.58,depth)*vec2(1.,-1.);
-  vec2 bl=ray(n,1.82,depth)*vec2(1.,-1.);
-  vec3 color=vec3(sampleScene(p+r).r,sampleScene(p+g).g,sampleScene(p+bl).b);
-  color=mix(color,vec3(.045,.062,.086),.15);
-  float f0=.0672,fresnel=f0+(1.-f0)*pow(1.-n.z,5.);
+  vec3 color=uiTransmission(p,local,cssSize*.5,width,vec2(1.,-1.),1.);
+  color=mix(color,vec3(.045,.062,.086),uiTintAmount(1.));
+  float f0=pow((uiIOR-1.)/(uiIOR+1.),2.),fresnel=f0+(1.-f0)*pow(1.-n.z,5.);
   vec2 lightDelta=(light-p)*vec2(1.,-1.);
   vec3 lamp=normalize(vec3(lightDelta*.004,.9));
   float sheen=pow(max(dot(n,normalize(lamp+vec3(0.,0.,1.))),0.),42.);

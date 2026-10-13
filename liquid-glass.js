@@ -23,6 +23,8 @@
     uniform float u_dark;
     uniform float u_invert;
     uniform float u_profile;
+    uniform vec4 u_curve; // Explicit shoulder width, edge fraction, bias, exponent.
+    uniform vec2 u_section; // Front share, scene distance behind the slab midplane.
     uniform float u_enabled;
     uniform vec2 u_light;
     uniform vec4 u_lens; // Optional scene-only cursor lens: center, radius, strength.
@@ -55,6 +57,75 @@
       vec3 ray = refract(vec3(0.0, 0.0, -1.0), normal, 1.0 / max(ior, 1.0));
       return ray.xy / max(abs(ray.z), 0.15) * depth;
     }
+    vec2 boxNormal(vec2 p, vec2 halfSize, float radius) {
+      vec2 q = abs(p) - halfSize + radius, corner = max(q, 0.0);
+      float lengthCorner = length(corner);
+      return lengthCorner > 0.0001 ? sign(p) * corner / lengthCorner
+        : (q.x > q.y ? vec2(sign(p.x), 0.0) : vec2(0.0, sign(p.y)));
+    }
+    vec2 sectionCurve(float distance, float width) {
+      float t = clamp(-distance / width, 0.0, 1.0), b = u_curve.z;
+      float q = (1.0 + b) * t / (t + b), tail = max(0.0, 1.0 - q);
+      float h = 1.0 - pow(tail, u_curve.w);
+      float derivative = u_curve.w * pow(tail, u_curve.w - 1.0)
+        * b * (1.0 + b) / ((t + b) * (t + b));
+      return vec2(u_curve.y + (1.0 - u_curve.y) * h,
+        (1.0 - u_curve.y) * derivative / width);
+    }
+    vec3 sectionBounds(vec3 point, vec2 halfSize, float radius, float width) {
+      float d = roundedBox(point.xy, halfSize, radius);
+      float height = u_material.y * sectionCurve(d, width).x;
+      return vec3(d, point.z - height * u_section.x,
+        -height * (1.0 - u_section.x) - point.z);
+    }
+    vec3 sectionNormal(vec3 point, vec2 halfSize, float radius, float width) {
+      vec3 bounds = sectionBounds(point, halfSize, radius, width);
+      vec2 outward = boxNormal(point.xy, halfSize, radius);
+      if (bounds.x >= max(bounds.y, bounds.z)) return vec3(outward, 0.0);
+      float slope = u_material.y * sectionCurve(bounds.x, width).y;
+      return bounds.y > bounds.z ? normalize(vec3(outward * slope * u_section.x, 1.0))
+        : normalize(vec3(outward * slope * (1.0 - u_section.x), -1.0));
+    }
+    vec3 sectionExit(vec3 origin, vec3 ray, vec2 halfSize, float radius, float width) {
+      vec3 lower = vec3(-halfSize, -u_material.y * (1.0 - u_section.x));
+      vec3 upper = vec3(halfSize, u_material.y * u_section.x);
+      vec3 end = vec3(100000.0);
+      if (abs(ray.x) > 0.00001) end.x = ((ray.x > 0.0 ? upper.x : lower.x) - origin.x) / ray.x;
+      if (abs(ray.y) > 0.00001) end.y = ((ray.y > 0.0 ? upper.y : lower.y) - origin.y) / ray.y;
+      if (abs(ray.z) > 0.00001) end.z = ((ray.z > 0.0 ? upper.z : lower.z) - origin.z) / ray.z;
+      float lo = 0.0, hi = max(0.02, min(end.x, min(end.y, end.z)) + 0.02);
+      // The accepted concave hyperbola produces a convex closed slab, so a
+      // ray starting inside has one exit. Bisection also catches rounded sides.
+      for (int step = 0; step < 12; step++) {
+        float mid = (lo + hi) * 0.5;
+        vec3 bounds = sectionBounds(origin + ray * mid, halfSize, radius, width);
+        if (max(bounds.x, max(bounds.y, bounds.z)) <= 0.0) lo = mid; else hi = mid;
+      }
+      return origin + ray * ((lo + hi) * 0.5);
+    }
+    vec3 sectionTransmission(vec2 p, vec2 local, vec2 halfSize, float radius,
+      float width, vec3 normal, float ior) {
+      if (u_enabled < 0.5) return softened(p, u_material.z);
+      ior = max(1.001, ior);
+      float d = roundedBox(local, halfSize, radius);
+      vec2 entry = local - boxNormal(local, halfSize, radius) * max(d + 0.01, 0.0);
+      float front = u_material.y * u_section.x * sectionCurve(roundedBox(entry, halfSize, radius), width).x;
+      vec3 ray = refract(vec3(0.0, 0.0, -1.0), normal, 1.0 / ior);
+      vec3 origin = vec3(entry, front) + ray * 0.02;
+      for (int bounce = 0; bounce < 3; bounce++) {
+        vec3 exitPoint = sectionExit(origin, ray, halfSize, radius, width);
+        vec3 exitNormal = sectionNormal(exitPoint, halfSize, radius, width);
+        vec3 outgoing = refract(ray, -exitNormal, ior);
+        if (dot(outgoing, outgoing) > 0.00001) {
+          // Only the scene behind the UI is available to this compositor.
+          if (outgoing.z >= -0.02) return softened(p, u_material.z);
+          float distance = max(0.0, (-u_section.y - exitPoint.z) / outgoing.z);
+          return softened(u_rect.xy + halfSize + exitPoint.xy + outgoing.xy * distance, u_material.z);
+        }
+        ray = reflect(ray, exitNormal); origin = exitPoint + ray * 0.02;
+      }
+      return softened(p, u_material.z);
+    }
     void main() {
       vec2 p = vec2(gl_FragCoord.x / u_dpr, u_resolution.y - gl_FragCoord.y / u_dpr);
       vec3 original = sampleScene(p);
@@ -82,7 +153,13 @@
       float edge = 1.0 - clamp(-dist / max(bevel, 1.0), 0.0, 1.0);
       float slope = pow(edge, 1.7) * 2.8;
       float localThickness = 1.0;
-      if (u_profile > 1.5) {
+      float sectionWidth = max(0.5, min(u_curve.x, min(halfSize.x, halfSize.y) * 0.98));
+      if (u_profile > 2.5) {
+        vec2 profile = sectionCurve(dist, sectionWidth);
+        slope = u_material.y * u_section.x * profile.y;
+        localThickness = profile.x;
+        edge = (1.0 - profile.x) / max(0.001, 1.0 - u_curve.y);
+      } else if (u_profile > 1.5) {
         // Hyperbolic easing, with an exact C2 join to the flat interior:
         // q(t) = (1+b)t/(t+b), h(t) = 1 - (1-q)^3.
         // Both h'(1) and h''(1) are zero. A wider shoulder avoids the
@@ -112,14 +189,23 @@
       vec2 crown = u_profile > 1.5 ? vec2(0.0) : local / halfSize * 0.045;
       vec3 normal = normalize(vec3(outward * slope + crown, 1.0));
       float depth = u_material.y * localThickness * u_enabled;
-      vec2 offset = rayOffset(normal, u_material.x, depth);
-      vec3 transmitted = softened(p + offset, u_material.z);
-      if (u_material.w > 0.0 && u_enabled > 0.0) {
-        // Wavelength-dependent IOR, not a colored CSS outline.
-        vec2 redOffset = rayOffset(normal, u_material.x - u_material.w, depth);
-        vec2 blueOffset = rayOffset(normal, u_material.x + u_material.w, depth);
-        transmitted.r = softened(p + redOffset, u_material.z).r;
-        transmitted.b = softened(p + blueOffset, u_material.z).b;
+      vec3 transmitted;
+      if (u_profile > 2.5) {
+        transmitted = sectionTransmission(p, local, halfSize, radius, sectionWidth, normal, u_material.x);
+        if (u_material.w > 0.0 && u_enabled > 0.0) {
+          transmitted.r = sectionTransmission(p, local, halfSize, radius, sectionWidth, normal, u_material.x - u_material.w).r;
+          transmitted.b = sectionTransmission(p, local, halfSize, radius, sectionWidth, normal, u_material.x + u_material.w).b;
+        }
+      } else {
+        vec2 offset = rayOffset(normal, u_material.x, depth);
+        transmitted = softened(p + offset, u_material.z);
+        if (u_material.w > 0.0 && u_enabled > 0.0) {
+          // Wavelength-dependent IOR, not a colored CSS outline.
+          vec2 redOffset = rayOffset(normal, u_material.x - u_material.w, depth);
+          vec2 blueOffset = rayOffset(normal, u_material.x + u_material.w, depth);
+          transmitted.r = softened(p + redOffset, u_material.z).r;
+          transmitted.b = softened(p + blueOffset, u_material.z).b;
+        }
       }
       float darkTint = mix(u_dark, 1.0 - u_dark, u_invert);
       vec3 tint = mix(vec3(0.99, 0.99, 0.97), vec3(0.055, 0.065, 0.1), darkTint);
@@ -216,7 +302,7 @@
           throw new Error(gl.getProgramInfoLog(program));
         this.program = program;
         gl.useProgram(program);
-        const buffer = gl.createBuffer();
+        const buffer = this.vertexBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
         gl.bufferData(
           gl.ARRAY_BUFFER,
@@ -238,6 +324,8 @@
           "dark",
           "invert",
           "profile",
+          "curve",
+          "section",
           "enabled",
           "light",
           "lens",
@@ -441,6 +529,7 @@
         u = this.uniforms,
         state = this.options.getState(),
         m = state.material;
+      const profile = state.profile?.kind === "hyperbolic" ? state.profile : null;
       const bounds = this.element.getBoundingClientRect();
       const surfaces = [...(this.options.getSurfaces?.() || this.element.querySelectorAll('.glass-surface'))]
         .map(surface => ({ surface, rect: surface.getBoundingClientRect() }));
@@ -462,8 +551,11 @@
       gl.uniform1f(u.invert, state.invertedTint ? 1 : 0);
       gl.uniform1f(
         u.profile,
-        { bevel: 0, rounded: 1, soft: 2 }[state.edgeProfile] ?? 2,
+        profile ? 3 : ({ bevel: 0, rounded: 1, soft: 2 }[state.edgeProfile] ?? 2),
       );
+      gl.uniform4f(u.curve, profile?.shoulder ?? 1, profile?.edge ?? 0.18,
+        profile?.bias ?? 0.438, profile?.exponent ?? 3);
+      gl.uniform2f(u.section, profile?.front ?? 0.5, profile?.sceneDistance ?? 384);
       gl.uniform1f(u.enabled, state.refraction === false ? 0 : 1);
       gl.uniform2f(u.light, this.light[0] + bounds.left - view.left, this.light[1] + bounds.top - view.top);
       const lens = state.lens;
@@ -483,7 +575,7 @@
         gl.uniform4f(u.lens, 0, 0, 1, 0);
       }
       const backdropKey = `${this.sourceVersion}/${lens?.x}/${lens?.y}/${lens?.radius}/${lens?.strength}`;
-      if (this.backdrop && this.backdropKey !== backdropKey) {
+      if (this.backdrop && !this.options.hideBackdrop && this.backdropKey !== backdropKey) {
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.bindTexture(gl.TEXTURE_2D, input);
         gl.uniform4f(u.rect, 0, 0, -1, 0);
@@ -492,6 +584,26 @@
         this.backdropKey = backdropKey;
       }
       // Ping-pong buffers ensure each button refracts the already-rendered parent glass.
+      // Seed both targets once. After each draw they differ only in that draw's
+      // rectangle, so copying that rectangle synchronizes the next destination.
+      const partial = this.options.scissorSurfaces && !passOffset;
+      const clip = rect => {
+        const x = Math.max(0, Math.floor((rect.left - view.left - 3) * view.dpr));
+        const y = Math.max(0, this.canvas.height - Math.ceil((rect.bottom - view.top + 3) * view.dpr));
+        const right = Math.min(this.canvas.width, Math.ceil((rect.right - view.left + 3) * view.dpr));
+        const top = Math.min(this.canvas.height, this.canvas.height - Math.floor((rect.top - view.top - 3) * view.dpr));
+        gl.scissor(x, y, Math.max(0, right - x), Math.max(0, top - y));
+      };
+      if (partial) {
+        gl.disable(gl.SCISSOR_TEST);
+        gl.bindTexture(gl.TEXTURE_2D, input);
+        gl.uniform4f(u.rect, 0, 0, -1, 0);
+        for (const target of this.targets) {
+          gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
+          gl.drawArrays(gl.TRIANGLES, 0, 6);
+        }
+        gl.enable(gl.SCISSOR_TEST);
+      }
       surfaces.forEach(({ surface, rect }, index) => {
         const nested =
             !!surface.parentElement.closest(".glass-surface") ||
@@ -499,6 +611,14 @@
         const target = this.targets[(index + passOffset) % 2];
         gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
         gl.bindTexture(gl.TEXTURE_2D, input);
+        if (partial) {
+          if (index) {
+            clip(surfaces[index - 1].rect);
+            gl.uniform4f(u.rect, 0, 0, -1, 0);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+          }
+          clip(rect);
+        }
         gl.uniform4f(
           u.rect,
           rect.left - view.left,
@@ -513,7 +633,7 @@
         gl.uniform4f(
           u.material,
           m.ior,
-          m.thickness * (nested ? 0.42 : 1),
+          m.thickness * (profile ? 1 : nested ? 0.42 : 1),
           m.roughness * (nested ? 0.45 : 1),
           m.dispersion,
         );
@@ -521,12 +641,26 @@
         gl.drawArrays(gl.TRIANGLES, 0, 6);
         input = target.texture;
       });
+      if (partial) gl.disable(gl.SCISSOR_TEST);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.bindTexture(gl.TEXTURE_2D, input);
       gl.uniform4f(u.rect, 0, 0, -1, 0);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       if (this.backdrop) this.presentAttachedFrame(view);
       this.element.dataset.rendered = "true";
+    }
+    dispose() {
+      cancelAnimationFrame(this.frame);
+      this.observer?.disconnect();
+      this.failed = true;
+      for (const layer of this.layers.values()) layer.canvas.remove();
+      this.layers.clear();
+      if (!this.gl) return;
+      for (const target of this.targets || []) {
+        this.gl.deleteTexture(target.texture); this.gl.deleteFramebuffer(target.framebuffer);
+      }
+      this.gl.deleteTexture(this.sourceTexture); this.gl.deleteBuffer(this.vertexBuffer);
+      this.gl.deleteProgram(this.program);
     }
   }
 

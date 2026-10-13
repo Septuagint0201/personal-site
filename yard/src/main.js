@@ -1,10 +1,12 @@
 import './style.css';
 import './interaction.css';
+import { createUIGlass } from './ui-glass.js';
 import { createPlayground } from './scene.js';
 import { createDiscoveries } from './discoveries.js';
 
 const $ = selector => document.querySelector(selector);
 const stage = $('#stage');
+const uiGlass = createUIGlass();
 const toastElement = $('#toast');
 const motion = matchMedia('(prefers-reduced-motion: reduce)');
 const unlocked = new Set();
@@ -57,6 +59,7 @@ function showError(message) {
 }
 try {
   playground = createPlayground(stage, {
+    onFrame: uiGlass.capture,
     onHit: () => discoveries.hit(),
     onHold: () => discoveries.hold(),
     onSceneChange: updateStudy,
