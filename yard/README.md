@@ -127,7 +127,7 @@ The optical transport remains unchanged. Temporal resolve bypasses neighbourhood
 - Backups and source archives live outside the public root in sibling `yard-backups` and `yard-sources` directories.
 - Upload hashed assets and cover art first, then atomically replace chapter HTML before the root menu after backing up the previous public directory. Deploy both generated HTML names in each directory. Retain older hashed assets so already-open clients can finish loading them.
 
-Historical deployment backups were cleared at the owner's request after the accepted release. Rebuild an earlier revision from Git when needed; do not assume the original welcome-page backup still exists. The repository-root `tools/build-release.mjs` generates gzip sidecars and checksums for both sites. The `deploy/nginx/` snippets enable source compression, HTTP/2 and version-aware cache headers without changing chapter rendering.
+Historical deployment backups were cleared at the owner's request after the accepted release. Rebuild an earlier revision from Git when needed; do not assume the original welcome-page backup still exists. The repository-root `tools/build-release.mjs` generates Brotli/gzip sidecars and checksums for both sites. The `deploy/nginx/` snippets enable source compression, HTTP/2 and version-aware cache headers without changing chapter rendering.
 
 ## Verification
 

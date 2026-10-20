@@ -104,8 +104,8 @@ YARD UI 在场景最终绘制后保留帧快照，最多 30Hz 更新材质，暂
 
 ## Transfer maintenance — 2026-10-20
 
-迁移后的站点继续使用配置好的 `septuagint-vm1` SSH 别名，不固定服务器 IP。发布流程现在可重复执行：先运行 `npm run build --prefix yard`，再运行 `node tools/build-release.mjs <新的输出目录>`。输出包含 Candy 和 YARD、SHA-256 清单及 gzip 预压缩副本。原始文件与 gzip 解压结果必须逐字节一致；压缩副本与原文件保持相同修改时间。Candy 的图片、脚本和样式均生成内容哈希名称；实验页和开发工具不进入发布目录。
+迁移后的站点继续使用配置好的 `septuagint-vm1` SSH 别名，不固定服务器 IP。发布流程现在可重复执行：先运行 `npm run build --prefix yard`，再运行 `node tools/build-release.mjs <新的输出目录>`。输出包含 Candy 和 YARD、SHA-256 清单及 Brotli 11 / gzip 9 预压缩副本。原始文件与两种解压结果必须逐字节一致；压缩副本与原文件保持相同修改时间。Candy 的图片、脚本和样式均生成内容哈希名称；文本资源使用固定的 `br-` 发布前缀，以绕开 CDN 已缓存的旧 gzip-only 版本，此前缀不随每次发布变化。实验页和开发工具不进入发布目录。
 
 主页背景保留 4093×1842 原尺寸，增加 AVIF（质量 90、4:4:4）版本，从 1,313,302 字节降至 929,533 字节。相对原 JPEG 解码像素，RGB PSNR 48.12 dB、平均绝对通道误差 0.518/255；这属于近无损转换，并非逐像素无损。头像增加 192/384 像素无损 WebP（51,082 / 173,006 字节），浏览器按显示密度选择；原始 1024 像素 JPEG 保留。`picture` 选择的背景图同时供 CSS 降级展示和 WebGL 纹理使用，避免两种格式重复下载；不支持 AVIF 或 AVIF 加载失败时回退到原 JPEG。玻璃参数、渲染分辨率和场景采样不变。
 
-Nginx 配置模板位于 `deploy/nginx/`：cache map 放在 `http` 上下文，static snippet 仅由 Candy / YARD 的 HTTPS server 引入。启用 HTTP/2、gzip_static 和文本类型动态 gzip；带内容哈希的资源缓存一年并标记 immutable，HTML 必须重新验证，未带哈希的图片缓存一小时。仅成功响应附加缓存头，避免把不存在的哈希资源 404 缓存一年。Cloudflare 的浏览器侧 Brotli/HTTP/3 保持现有配置；源站 gzip 的节省不等于浏览器侧同等比例的收益。修改后必须先 `nginx -t` 再平滑 reload，并验证源站 / CDN、gzip 解码一致性、ETag 304、404 和所有章节入口。
+Nginx 配置模板位于 `deploy/nginx/`：cache map 放在 `http` 上下文，static snippet 仅由 Candy / YARD 的 HTTPS server 引入。服务器先安装 Ubuntu 官方仓库的 `libnginx-mod-http-brotli-static`，再启用 HTTP/2、brotli_static、gzip_static 和文本类型动态 gzip；高压缩工作在构建时完成。带内容哈希的资源缓存一年并标记 immutable，HTML 必须重新验证，未带哈希的图片缓存一小时。仅成功响应附加缓存头，避免把不存在的哈希资源 404 缓存一年。Cloudflare 的现有 HTTP/3 配置保留；源站压缩的节省不等于浏览器侧同等比例的收益。修改后必须先 `nginx -t` 再平滑 reload，并验证源站 / CDN、两种解码一致性、不接受压缩的客户端、ETag 304、404 和所有章节入口。

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { cp, mkdir, readFile, readdir, stat, writeFile, utimes } from 'node:fs/promises';
 import { dirname, resolve, relative, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { gzipSync } from 'node:zlib';
+import { gzipSync, brotliCompressSync, constants } from 'node:zlib';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 if (!process.argv[2]) throw new Error('Usage: node tools/build-release.mjs <new-output-directory>');
@@ -26,7 +26,8 @@ for (const source of [...images, ...scripts]) {
   let data = await readFile(resolve(root, source));
   if (scripts.includes(source)) data = Buffer.from(rewrite(data.toString('utf8')));
   const extension = extname(source);
-  const name = `${source.slice(0, -extension.length)}-${hash(data).slice(0, 12)}${extension}`;
+  const prefix = scripts.includes(source) ? 'br-' : '';
+  const name = `${prefix}${source.slice(0, -extension.length)}-${hash(data).slice(0, 12)}${extension}`;
   names.set(source, name);
   await writeFile(resolve(candy, name), data);
 }
@@ -42,18 +43,26 @@ async function files(folder) {
   }
   return result;
 }
-const manifest = { files: {}, gzip: [], assets: Object.fromEntries(names) };
+const manifest = { files: {}, gzip: [], brotli: [], assets: Object.fromEntries(names) };
 for (const file of await files(output)) {
   const data = await readFile(file);
   manifest.files[relative(output, file).replaceAll('\\', '/')] = hash(data);
   if (!/\.(?:html|js|css|svg|json|txt)$/.test(file)) continue;
-  const packed = gzipSync(data, { level: 9 });
-  if (packed.length + 64 >= data.length) continue;
-  await writeFile(`${file}.gz`, packed);
   const info = await stat(file);
-  await utimes(`${file}.gz`, info.atime, info.mtime);
-  manifest.files[`${relative(output, file).replaceAll('\\', '/')}.gz`] = hash(packed);
-  manifest.gzip.push({ file: relative(output, file).replaceAll('\\', '/'), original: data.length, compressed: packed.length });
+  const variants = [
+    ['gzip', 'gz', gzipSync(data, { level: 9 })],
+    ['brotli', 'br', brotliCompressSync(data, { params: {
+      [constants.BROTLI_PARAM_QUALITY]: 11,
+      [constants.BROTLI_PARAM_MODE]: constants.BROTLI_MODE_TEXT,
+    } })],
+  ];
+  for (const [encoding, suffix, packed] of variants) {
+    if (packed.length + 64 >= data.length) continue;
+    await writeFile(`${file}.${suffix}`, packed);
+    await utimes(`${file}.${suffix}`, info.atime, info.mtime);
+    manifest.files[`${relative(output, file).replaceAll('\\', '/')}.${suffix}`] = hash(packed);
+    manifest[encoding].push({ file: relative(output, file).replaceAll('\\', '/'), original: data.length, compressed: packed.length });
+  }
 }
 await writeFile(resolve(output, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-console.log(JSON.stringify({ output, files: Object.keys(manifest.files).length, gzip: manifest.gzip.length }));
+console.log(JSON.stringify({ output, files: Object.keys(manifest.files).length, gzip: manifest.gzip.length, brotli: manifest.brotli.length }));

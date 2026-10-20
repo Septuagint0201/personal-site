@@ -27,6 +27,10 @@ export default defineConfig({
     rolldownOptions: {
       input: pages,
       output: {
+        // A stable delivery revision avoids older gzip-only CDN cache entries.
+        entryFileNames: 'assets/br-[name]-[hash].js',
+        chunkFileNames: 'assets/br-[name]-[hash].js',
+        assetFileNames: 'assets/br-[name]-[hash][extname]',
         manualChunks(id) {
           if (id.includes("node_modules/three/")) return "three";
         },
