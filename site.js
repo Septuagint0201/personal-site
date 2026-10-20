@@ -138,6 +138,7 @@
     }));
   }
   const background = window.DepthBackground.createRenderer({
+    image: document.getElementById("background-art"),
     onChange: () => {
       scene.dataset.depthRenderer = background.failed ? "fallback" : "webgl";
       renderer?.refreshBackground();

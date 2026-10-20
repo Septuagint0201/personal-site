@@ -51,14 +51,20 @@ body {
   color: var(--text);
   min-width: 280px;
 }
-.site-scene::before {
-  content: "";
+.background-art {
   position: absolute;
   inset: 12% 13%;
   border-radius: 64px;
-  background: linear-gradient(var(--scene-overlay), var(--scene-overlay)), url("bg.jpg") center / cover;
+  overflow: hidden;
 }
-.site-scene[data-renderer="webgl"]::before {
+.background-art img { width: 100%; height: 100%; object-fit: cover; }
+.background-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(var(--scene-overlay), var(--scene-overlay));
+}
+.site-scene[data-renderer="webgl"] .background-art {
   display: none;
 }
 .site-scene {

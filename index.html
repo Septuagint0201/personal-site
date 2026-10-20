@@ -9,6 +9,7 @@
     />
     <meta name="theme-color" content="#171d30" />
     <title>Septuagint</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23171d30'/%3E%3Ctext x='18' y='48' font-family='Georgia,serif' font-size='48' font-style='italic' fill='%23e7e2fa'%3ES%3C/text%3E%3C/svg%3E" />
     <script>
       (() => {
         let theme = "system";
@@ -23,15 +24,20 @@
             : "dark";
       })();
     </script>
-    <link rel="preload" as="image" href="avatar.jpg" />
-    <link rel="stylesheet" href="site.css?v=11" />
+    <link rel="preload" as="image" type="image/webp" href="avatar-192.webp" imagesrcset="avatar-192.webp 192w, avatar-384.webp 384w" imagesizes="96px" />
+    <link rel="preload" as="image" type="image/avif" href="bg.avif" />
+    <link rel="stylesheet" href="site.css?v=12" />
     <script src="ui-glass-preset.js?v=1" defer></script>
-    <script src="depth-background.js?v=6" defer></script>
+    <script src="depth-background.js?v=7" defer></script>
     <script src="liquid-glass.js?v=13" defer></script>
-    <script src="site.js?v=18" defer></script>
+    <script src="site.js?v=19" defer></script>
   </head>
   <body>
     <div class="site-scene" id="site-scene" aria-hidden="true">
+      <picture class="background-art">
+        <source srcset="bg.avif" type="image/avif" />
+        <img id="background-art" src="bg.jpg" width="4093" height="1842" decoding="async" alt="" />
+      </picture>
       <canvas id="glass-canvas"></canvas>
     </div>
     <header class="site-header" aria-label="Septuagint 个人主页">
@@ -65,7 +71,9 @@
         <div class="profile">
           <div class="avatar-wrap">
             <span class="avatar-fallback" aria-hidden="true">S</span>
-            <img
+            <picture>
+              <source type="image/webp" srcset="avatar-192.webp 192w, avatar-384.webp 384w" sizes="96px" />
+              <img
               src="avatar.jpg"
               class="avatar"
               width="96"
@@ -73,7 +81,8 @@
               decoding="async"
               fetchpriority="high"
               alt="Septuagint 的头像"
-            />
+              />
+            </picture>
           </div>
           <p class="eyebrow card-greeting">HELLO, I'M</p>
           <h1 id="name">

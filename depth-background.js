@@ -263,8 +263,7 @@
     }
   `;
 
-  function createRenderer({ onChange = () => {}, onImageError = () => {} } = {}) {
-    const image = new Image();
+  function createRenderer({ onChange = () => {}, onImageError = () => {}, image = new Image() } = {}) {
     const backgroundCanvas = document.createElement("canvas");
     let gl, program, uniforms, texture, backgroundReady = false;
     let backgroundFailed = false, imageReady = false, contextLost = false;
@@ -333,7 +332,7 @@
         ctx.drawImage(backgroundCanvas,0,0,width,height);
       } else {
         ctx.fillStyle=state.dark?"#242a40":"#bec5d4";ctx.fillRect(0,0,width,height);
-        if(imageReady){const scale=Math.max(width/image.width,height/image.height);ctx.globalAlpha=.5;ctx.drawImage(image,(width-image.width*scale)/2,(height-image.height*scale)/2,image.width*scale,image.height*scale);ctx.globalAlpha=1;}
+        if(imageReady){const iw=image.naturalWidth,ih=image.naturalHeight,scale=Math.max(width/iw,height/ih);ctx.globalAlpha=.5;ctx.drawImage(image,(width-iw*scale)/2,(height-ih*scale)/2,iw*scale,ih*scale);ctx.globalAlpha=1;}
         if(composition){
           const veil=ctx.createRadialGradient(width*.5,height*.51,0,width*.5,height*.51,Math.max(width*.42,height*.58));
           veil.addColorStop(0,state.dark?"rgba(19,27,46,.42)":"rgba(110,122,150,.12)");
@@ -344,16 +343,28 @@
       }
     }
     initializeBackground();
-    image.onload = () => {
+    function imageLoaded() {
+      if (!image.naturalWidth) return;
       imageReady = true;
       if (backgroundReady && !contextLost && !backgroundFailed) {
         try { uploadImage(); } catch { failBackground(); }
       }
       sceneKey = "";
       onChange();
-    };
-    image.onerror = () => { onImageError(); onChange(); };
-    image.src = "bg.jpg";
+    }
+    function imageError() {
+      const sources = image.parentElement?.tagName === "PICTURE"
+        ? image.parentElement.querySelectorAll("source") : [];
+      if (sources.length) {
+        for (const source of sources) source.remove();
+        return; // The picture now selects its original JPEG fallback.
+      }
+      onImageError(); onChange();
+    }
+    image.addEventListener("load", imageLoaded);
+    image.addEventListener("error", imageError);
+    if (!image.getAttribute("src")) image.src = "bg.jpg";
+    else if (image.complete) queueMicrotask(image.naturalWidth ? imageLoaded : imageError);
     backgroundCanvas.addEventListener("webglcontextlost", event => {
       event.preventDefault(); contextLost = true; failBackground(); onChange();
     });
