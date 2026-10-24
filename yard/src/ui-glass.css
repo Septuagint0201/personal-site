@@ -10,7 +10,7 @@ body.ui-glass-ready .ui-glass-viewport:not(.no-webgl) { visibility: visible; }
 }
 body.ui-glass-ready .ui-glass-surface {
   background: transparent !important;
-  backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
   border-color: #dcefff55;
 }
 body.ui-glass-ready .ui-glass-surface > .glass-presentation { display: block; }
