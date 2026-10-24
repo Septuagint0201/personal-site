@@ -1,0 +1,22 @@
+/* A shallow tint/blur on the existing parent glass, never a second optical pass. */
+:root .glass-surface.surface-button-frost {
+  background: rgb(var(--surface-button-tone, 0) var(--surface-button-tone, 0) var(--surface-button-tone, 0) / var(--surface-button-opacity, .15)) !important;
+  -webkit-backdrop-filter: blur(var(--surface-button-blur, 10px)) saturate(var(--surface-button-saturation, .8)) !important;
+  backdrop-filter: blur(var(--surface-button-blur, 10px)) saturate(var(--surface-button-saturation, .8)) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+/* The old attached fallback may survive until the next compositor submission. */
+:root .glass-surface.surface-button-frost > .glass-presentation { display: none !important; }
+@media (hover: hover) and (pointer: fine) {
+  :root .glass-surface.surface-button-frost:hover {
+    background: rgb(var(--surface-button-tone, 0) var(--surface-button-tone, 0) var(--surface-button-tone, 0) / calc(var(--surface-button-opacity, .15) + .06)) !important;
+  }
+}
+:root .glass-surface.surface-button-frost:is(:focus-visible, [aria-selected="true"], [aria-pressed="true"]) {
+  background: rgb(var(--surface-button-tone, 0) var(--surface-button-tone, 0) var(--surface-button-tone, 0) / calc(var(--surface-button-opacity, .15) + .06)) !important;
+}
+:root .glass-surface.surface-button-frost:active {
+  background: rgb(var(--surface-button-tone, 0) var(--surface-button-tone, 0) var(--surface-button-tone, 0) / calc(var(--surface-button-opacity, .15) + .10)) !important;
+}

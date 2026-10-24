@@ -1,8 +1,10 @@
 import '../../ui-glass-preset.js';
 import '../../liquid-glass.js';
+import '../../ui-surface-buttons.js';
 import './ui-glass.css';
 import './capsule-controls.css';
 import './notes-layout.css';
+import '../../ui-surface-buttons.css';
 import { createFramePacer } from './frame-pacing.js';
 
 export const UI_GLASS = window.SiteGlassPreset;
@@ -10,6 +12,8 @@ export const UI_GLASS = window.SiteGlassPreset;
 // One compositor per page, fed immediately after the scene's final draw.
 // A retained snapshot supports paused scenes, dialogs and transient picker UI.
 export function createUIGlass({ dark = false, maxFps = 0 } = {}) {
+  const surfaceButtons = window.SiteSurfaceButtons;
+  surfaceButtons.applyTheme(document.documentElement, dark);
   document.documentElement.style.setProperty('--ui-glass-radius', `${UI_GLASS.profile.radius}px`);
   const stage = document.createElement('div'), buffer = document.createElement('canvas');
   stage.className = 'ui-glass-stage'; stage.setAttribute('aria-hidden', 'true');
@@ -38,7 +42,7 @@ export function createUIGlass({ dark = false, maxFps = 0 } = {}) {
       if (node.matches('button, a, [role="option"], .stick-thumb')) node.setAttribute('data-glass-compact', '');
       if (getComputedStyle(node).position === 'static') node.style.position = 'relative';
     }
-    return nodes.filter(node => (!scope || node === scope || scope.contains(node))
+    return surfaceButtons.classify(nodes).filter(node => (!scope || node === scope || scope.contains(node))
       && (!omitted || (node !== omitted && !omitted.contains(node)))
       && (node.checkVisibility ? node.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) : node.getClientRects().length > 0)
       && node.getBoundingClientRect().width > 1 && node.getBoundingClientRect().height > 1);
@@ -89,9 +93,11 @@ export function createUIGlass({ dark = false, maxFps = 0 } = {}) {
     return true;
   }
   document.body.dataset.uiGlass = UI_GLASS.revision;
+  surfaces(); // Establish the same hierarchy while the scene/GL is preparing.
   function update(now) {
     pending = 0;
-    if (disposed || document.hidden || !ready) return;
+    if (disposed || document.hidden) return;
+    if (!ready || renderer.failed) { surfaces(); return; }
     if (syncOverlay()) renderer.renderNow();
     if (!pacer || pacer.ready(now)) (overlayActive() ? overlayRenderer : renderer).request();
     if (now < until) pending = requestAnimationFrame(update);
@@ -108,7 +114,7 @@ export function createUIGlass({ dark = false, maxFps = 0 } = {}) {
   }
   const events = ['click', 'input', 'change', 'focusin', 'focusout', 'pointerdown', 'pointerup', 'keydown', 'keyup', 'toggle', 'close'];
   for (const event of events) document.addEventListener(event, invalidate, true);
-  function resize() { renderer.resize(); overlayRenderer?.resize(); invalidate(); }
+  function resize() { surfaces(); renderer.resize(); overlayRenderer?.resize(); invalidate(); }
   function scroll() {
     if (disposed || !ready || document.hidden) return;
     if (syncOverlay()) renderer.renderNow();

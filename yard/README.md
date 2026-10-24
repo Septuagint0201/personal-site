@@ -86,6 +86,8 @@ The prototype tests cover regular tetrahedral geometry, gentle return, one-way d
 
 ## Rendering and accessibility
 
+Small controls inside an existing glass panel use the shared `../ui-surface-buttons.js` / `.css` surface treatment: 10px backdrop blur, 80% saturation and 15% tint opacity. Tint brightness is 67% in the light chapters/directory and 34% in the dark chamber; foreground colors retain each page's theme. These controls are excluded from the additional optical pass. Standalone controls and nested controls with a layout short side of at least 96px keep the original B glass; `data-surface-treatment="glass"` explicitly keeps glass regardless of size. Layout dimensions, rather than hover transforms, determine the treatment, so existing hover/press scaling cannot switch materials. Panel optics, control geometry and the flat picker-menu rows are unchanged.
+
 The menu uses a shared procedural architectural background and WebGL screen-space Snell refraction. Its cards and triangle arrows use the shared B profile: a 6px hyperbolic front, planar back, IOR 1.45 and dispersion 0.10. They sample the current background texture through both interfaces. It approximates transparent card optics, not full 3D ray tracing. CSS provides a readable fallback. The directory does not load Three.js.
 
 Chapter 01 uses physically based raster rendering with MeshPhysicalMaterial transmission, thickness, Fresnel reflection, dispersion, an environment map, and real-time lights. Beveled geometry and a bright architectural room provide visible detail through the glass. Ground caustics are an artistic procedural approximation.
