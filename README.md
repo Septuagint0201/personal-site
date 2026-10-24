@@ -7,7 +7,7 @@ I'm glad you stopped by. I hope you find something interesting here that brings 
 本仓库同时维护两个网站：
 
 - 根目录：Candy 个人主页，部署于 https://candy-spt.com/ 。
-- [`yard/`](yard/README.md)：YARD 章节目录、第一章玻璃光学展厅、第二章液态玻璃展厅和第三章沙漠软玻璃实验，独立构建并部署于 https://yard.septuagint21.org/ 。
+- [`yard/`](yard/README.md)：YARD 章节目录、第一章玻璃光学展厅、第二章液态玻璃展厅和第三章沙漠软玻璃实验，独立构建并部署于 https://yard.candy-spt.com/ 。
 
 YARD 使用站点根路径；在 `yard/` 内运行，不直接作为 Candy 的 `/yard/` 子路径发布：
 
@@ -26,6 +26,12 @@ npm run build
 本机开发仓库位于 `E:\AMLY\works\HTML\personal-site`。原独立的 `E:\AMLY\works\HTML\yard` 已删除，后续统一在本仓库的 `yard/` 子目录开发。
 
 本机 `E:\AMLY\doc\repository-backup\personal-site` 是普通备份仓库，保留完整 `.git` 和当前提交中所有受 Git 跟踪的文件。备份不复制未跟踪或被忽略的文件，例如 `node_modules/`、`dist/`、日志；开发目录中的这些文件继续保留。备份同步前应确认工作区干净，然后依次执行 `git -C "E:\AMLY\doc\repository-backup\personal-site" fetch development` 和 `git -C "E:\AMLY\doc\repository-backup\personal-site" merge --ff-only development/main`。`development` 使用普通远端分支映射，不直接覆盖当前检出的分支，也不自动清除备份独有的历史引用。
+
+## YARD domain — 2026-10-25
+
+YARD 的正式地址为 `https://yard.candy-spt.com/`。Cloudflare DNS 通过 `cf` CLI 管理：`yard` 使用开启代理的 CNAME 指向 `candy-spt.com`，与主页共用源站定位。新站文档根目录为 `/home/septuagintuser/site/candy-spt.com/yard`，Nginx 模板见 `deploy/nginx/yard.candy-spt.com.conf`。
+
+旧地址 `yard.septuagint21.org` 的页面以 308 跳转，保留路径和查询参数；旧域名的静态资源继续从新目录提供，避免旧标签页的模块加载变成跨域请求。对应模板为 `deploy/nginx/yard-legacy-redirect.conf`。两个域名的 ACME 验证路径均保留，新增证书采用 webroot 自动续期并在续期后重载 Nginx；Cloudflare 仍使用严格 HTTPS 校验。页面的 canonical 地址与主页入口均指向新域名。
 
 ## Glass Lab
 
@@ -74,7 +80,7 @@ python -m http.server 8765 --bind 127.0.0.1
 
 首页装饰围绕个人宇宙主题：页眉字标、星点、椭圆轨道、两侧留白文字与页脚。星点和轨道由背景渲染器绘制，同样参与玻璃折射；1000px 及以下隐藏两侧文字。链接增加分区标识与方向箭头，箭头仅在悬停或键盘聚焦时轻微移动，并遵循减少动态效果设置。
 
-展示布局以 420px 主卡片和 42px 名字为视觉中心；GitHub 为主要入口，YARD 的独立玻璃行通往 [互动章节目录](https://yard.septuagint21.org/)，Steam、Discord、X、Pixiv 为双列链接，Email 独立收尾。YARD 目录提供返回 Candy 主页的入口，后续章节可在本仓库的 `yard/` 子项目继续扩展。兴趣标签「代码、游戏、图像」采用轻描边胶囊，对应现有入口，不包含实时状态或未经提供的近期项目。介绍文字为 14px，侧边装饰降低视觉权重。1000px 及以下将短文案移到卡片上方，手机独立调整头像、字号和间距；桌面高度不超过 820px 时使用 38px 名字和紧凑间距，使 1280×720 的首屏包含卡片与页脚。390×844 保留完整内容，320px 短屏正常纵向滚动，链接点击高度至少 44px。
+展示布局以 420px 主卡片和 42px 名字为视觉中心；GitHub 为主要入口，YARD 的独立玻璃行通往 [互动章节目录](https://yard.candy-spt.com/)，Steam、Discord、X、Pixiv 为双列链接，Email 独立收尾。YARD 目录提供返回 Candy 主页的入口，后续章节可在本仓库的 `yard/` 子项目继续扩展。兴趣标签「代码、游戏、图像」采用轻描边胶囊，对应现有入口，不包含实时状态或未经提供的近期项目。介绍文字为 14px，侧边装饰降低视觉权重。1000px 及以下将短文案移到卡片上方，手机独立调整头像、字号和间距；桌面高度不超过 820px 时使用 38px 名字和紧凑间距，使 1280×720 的首屏包含卡片与页脚。390×844 保留完整内容，320px 短屏正常纵向滚动，链接点击高度至少 44px。
 
 首页通过 `composition: 1` 启用独立的背景构图：降低后层反光、柔化插画细节，深色主题中央采用柔和遮罩提高文字对比。700px 以下的竖屏使用纵向叠片和等比插画裁切。实验页不传此选项，保持原有参数与画面。前景玻璃使用上述统一 B 预设。入场只渐显内容，不移动玻璃采样边界；头像波纹播放一次，名字打字完成后隐藏光标。粒子数量为 18–48，在卡片区域进一步减弱；卡片边界在布局变化时缓存，粒子帧内不读取 DOM。减少动态效果时立即显示完整名字并停用入场动画。
 

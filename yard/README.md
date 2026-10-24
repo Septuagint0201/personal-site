@@ -1,6 +1,6 @@
 # YARD — A collection of small universes
 
-Live: https://yard.septuagint21.org/
+Live: https://yard.candy-spt.com/
 
 This is the `yard/` subproject of the personal-site repository. Run the commands below from this directory. It is deployed at the YARD domain root independently of the Candy homepage; the absolute paths in its pages are not intended for a `/yard/` URL prefix.
 
@@ -70,7 +70,7 @@ Development: http://127.0.0.1:5178/. Production output: `dist/`. The build emits
 
 ## Chapter 03 — What the sand remembers
 
-Chapter URL: https://yard.septuagint21.org/chapters/03/. For local development, open `http://127.0.0.1:5178/chapters/03/` after `npm run dev`. The collection links to this chapter, and the production build includes both HTML index aliases for the existing server configuration.
+Chapter URL: https://yard.candy-spt.com/chapters/03/. For local development, open `http://127.0.0.1:5178/chapters/03/` after `npm run dev`. The collection links to this chapter, and the production build includes both HTML index aliases for the existing server configuration.
 
 Sand strokes now cut a deeper central groove with a broad shoulder and two scales of displaced rim. Each new stroke snapshots the current field and can cut into the next layer, bounded to 0.82 world units below the original surface. Repeated packets within one stroke use the same reference instead of accumulating depth indefinitely. Deeper cuts widen to support natural repose; displaced material is redistributed into the directional rims. Gel impact impressions are also deeper. Compression, subtle exposed-layer shading and raised-rim lightness reuse the terrain pass and dirty attribute region, with no extra render pass. Tests cover packet-count independence, repeated excavation, volume conservation and eventual settling.
 
@@ -121,9 +121,12 @@ The optical transport remains unchanged. Temporal resolve bypasses neighbourhood
 ## Server deployment
 
 - SSH alias: `septuagint-vm1`
-- Existing Nginx root: `/home/septuagintuser/site/septuagint21.org/yard`
+- Existing Nginx root: `/home/septuagintuser/site/candy-spt.com/yard`
+- Canonical hostname: `yard.candy-spt.com`; Cloudflare uses a proxied CNAME to `candy-spt.com`.
+- Legacy `yard.septuagint21.org` document URLs redirect with 308, preserving path/query. Static asset requests remain on the old origin and read from the new root, so already-open clients can finish loading modules.
 - Existing directory index: `yard.html`
 - Static-only deployment; no Node.js process or service restart is needed on the server.
+- The new certificate renews through the existing Certbot timer using the new webroot and a post-renewal Nginx reload. Both vhosts serve `/.well-known/acme-challenge/` directly; keep this exception when editing redirects.
 - Backups and source archives live outside the public root in sibling `yard-backups` and `yard-sources` directories.
 - Upload hashed assets and cover art first, then atomically replace chapter HTML before the root menu after backing up the previous public directory. Deploy both generated HTML names in each directory. Retain older hashed assets so already-open clients can finish loading them.
 
