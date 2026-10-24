@@ -22,7 +22,10 @@ function setup() {
     gl[name] = (key, ...args) => { values[key] = args; };
   gl.drawArrays = () => { counts.draws++; };
   const canvas = { getContext: () => gl, addEventListener: (type, listener) => { listeners[type] = listener; } };
-  const scope = { window: { devicePixelRatio: 1 }, document: { createElement: () => canvas }, Image: class {}, console };
+  class ImageStub extends EventTarget {
+    getAttribute(name) { return name === 'src' ? this.src || null : null; }
+  }
+  const scope = { window: { devicePixelRatio: 1 }, document: { createElement: () => canvas }, Image: ImageStub, console, queueMicrotask };
   vm.runInNewContext(source, scope);
   const renderer = scope.window.DepthBackground.createRenderer();
   const context = { drawImage: () => { counts.copies++; } };

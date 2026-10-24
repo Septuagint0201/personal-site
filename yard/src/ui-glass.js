@@ -17,8 +17,10 @@ export function createUIGlass({ dark = false, maxFps = 0 } = {}) {
   const snapshot = document.createElement('canvas'), context = snapshot.getContext('2d', { alpha: false });
   let ready = false, disposed = false, lastCapture = -Infinity, pending = 0, until = 0, captureTimer = 0;
   let capturedCanvas = null, capturedVersion;
+  let overlayHost = null, overlayStage = null, overlayRenderer = null;
   const pacer = maxFps > 0 ? createFramePacer(maxFps) : null;
-  const surfaces = () => {
+  const overlayActive = () => ready && overlayHost && overlayRenderer && !overlayRenderer.failed;
+  const surfaces = (scope = null, omitted = null) => {
     const nodes = [...document.querySelectorAll('button, a, dialog, .notes-card, .controls, .study-controls, .interaction-dock, .glass-select-menu, .move-stick, .stick-thumb, .toast, .announcement, .gallery-announcement')]
       .filter(node => !node.matches('.glass-arrow, .side-select, .stick-direction, .notes-shell')
         && !node.closest('.noscript, noscript, .loading, .render-loading, .fallback, .render-fallback'));
@@ -36,24 +38,62 @@ export function createUIGlass({ dark = false, maxFps = 0 } = {}) {
       if (node.matches('button, a, [role="option"], .stick-thumb')) node.setAttribute('data-glass-compact', '');
       if (getComputedStyle(node).position === 'static') node.style.position = 'relative';
     }
-    return nodes.filter(node => (node.checkVisibility ? node.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) : node.getClientRects().length > 0)
+    return nodes.filter(node => (!scope || node === scope || scope.contains(node))
+      && (!omitted || (node !== omitted && !omitted.contains(node)))
+      && (node.checkVisibility ? node.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) : node.getClientRects().length > 0)
       && node.getBoundingClientRect().width > 1 && node.getBoundingClientRect().height > 1);
   };
   const renderer = new window.LiquidGlass.Renderer(stage, {
     canvas: buffer, attachSurfaces: true, hideBackdrop: true, scissorSurfaces: true,
     maxDpr: 2, maxPixels: 1600000,
-    getSurfaces: surfaces,
+    getSurfaces: () => surfaces(null, overlayActive() ? overlayHost : null),
     getState: () => ({ material: UI_GLASS.material, profile: UI_GLASS.profile, dark, invertedTint: true, refraction: true }),
     getSurfaceEffects: node => ({ reflection: node.matches('button, a') ? .7 : 1,
       hover: node.matches(':hover, :focus-visible') ? 1 : 0, interactive: node.matches('button, a, [role="option"]') }),
     paintBackground(ctx, width, height) { if (ready) ctx.drawImage(snapshot, 0, 0, width, height); },
     onStatus(instance) { document.body.classList.toggle('ui-glass-ready', ready && !instance.failed); },
   });
+  function syncOverlay() {
+    const host = document.querySelector('dialog[open]') || document.querySelector('.glass-select-menu:not([hidden])');
+    if (host === overlayHost) return false;
+    overlayHost = host;
+    if (!host) { overlayStage?.remove(); return true; }
+    // Native scrolling exists inside notes and pickers. Give these a viewport
+    // canvas in their own DOM/top-layer context, behind their text. Stationary
+    // HUD and transformed 3D menu cards keep their existing stacking/composition.
+    if (!overlayStage) {
+      overlayStage = document.createElement('div');
+      overlayStage.className = 'ui-glass-viewport'; overlayStage.setAttribute('aria-hidden', 'true');
+      overlayStage.append(document.createElement('canvas'));
+    }
+    host.prepend(overlayStage);
+    if (!overlayRenderer) overlayRenderer = new window.LiquidGlass.Renderer(overlayStage, {
+      attachSurfaces: false, overlay: true, scissorSurfaces: true,
+      maxDpr: 2, maxPixels: 1600000,
+      getSurfaces: () => overlayHost ? surfaces(overlayHost) : [],
+      getSurfaceClip(node) {
+        const scroller = node.parentElement?.closest('.notes-scroll, .glass-select-menu');
+        return scroller?.getBoundingClientRect();
+      },
+      getState: () => ({ material: UI_GLASS.material, profile: UI_GLASS.profile, dark, invertedTint: true, refraction: true }),
+      getSurfaceEffects: node => ({ reflection: node.matches('button, a') ? .7 : 1,
+        hover: node.matches(':hover, :focus-visible') ? 1 : 0, interactive: node.matches('button, a, [role="option"]') }),
+      paintBackground(ctx, width, height) { if (ready) ctx.drawImage(snapshot, 0, 0, width, height); },
+      // Reconcile fallback per-surface layers both when this context is lost
+      // and when the fixed viewport context returns.
+      onStatus() { renderer.request(); invalidate(); },
+    });
+    overlayRenderer.light = [...renderer.light];
+    overlayRenderer.resize();
+    if (ready) overlayRenderer.refreshBackground();
+    return true;
+  }
   document.body.dataset.uiGlass = UI_GLASS.revision;
   function update(now) {
     pending = 0;
     if (disposed || document.hidden || !ready) return;
-    if (!pacer || pacer.ready(now)) renderer.request();
+    if (syncOverlay()) renderer.renderNow();
+    if (!pacer || pacer.ready(now)) (overlayActive() ? overlayRenderer : renderer).request();
     if (now < until) pending = requestAnimationFrame(update);
   }
   function invalidate() {
@@ -63,12 +103,21 @@ export function createUIGlass({ dark = false, maxFps = 0 } = {}) {
   }
   function pointer(event) {
     renderer.light = [event.clientX, event.clientY];
+    if (overlayRenderer) overlayRenderer.light = [...renderer.light];
     if (event.target.closest?.('.ui-glass-surface')) invalidate();
   }
-  const events = ['click', 'input', 'change', 'focusin', 'focusout', 'pointerdown', 'pointerup', 'toggle', 'close'];
+  const events = ['click', 'input', 'change', 'focusin', 'focusout', 'pointerdown', 'pointerup', 'keydown', 'keyup', 'toggle', 'close'];
   for (const event of events) document.addEventListener(event, invalidate, true);
-  window.addEventListener('resize', invalidate);
-  document.addEventListener('scroll', invalidate, true);
+  function resize() { renderer.resize(); overlayRenderer?.resize(); invalidate(); }
+  function scroll() {
+    if (disposed || !ready || document.hidden) return;
+    if (syncOverlay()) renderer.renderNow();
+    (overlayActive() ? overlayRenderer : renderer).renderNow();
+  }
+  const overlayObserver = new MutationObserver(invalidate);
+  overlayObserver.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['open', 'hidden'] });
+  window.addEventListener('resize', resize);
+  document.addEventListener('scroll', scroll, true);
   document.addEventListener('pointermove', pointer, { passive: true });
   function capture(canvas, version) {
     if (disposed || renderer.failed || document.hidden || !canvas?.width || !canvas?.height) return;
@@ -83,15 +132,23 @@ export function createUIGlass({ dark = false, maxFps = 0 } = {}) {
     ready = true;
     document.body.classList.toggle('ui-glass-ready', !renderer.failed);
     // Always retain the final frame, even when motion stops between UI ticks.
-    const flush = () => { captureTimer = 0; if (!disposed && !document.hidden) { lastCapture = performance.now(); pacer?.ready(lastCapture, true); renderer.refreshBackground(); } };
+    const flush = () => {
+      captureTimer = 0;
+      if (!disposed && !document.hidden) {
+        lastCapture = performance.now(); pacer?.ready(lastCapture, true);
+        syncOverlay(); renderer.refreshBackground();
+        if (overlayActive()) overlayRenderer.refreshBackground();
+      }
+    };
     if (now - lastCapture >= 1000 / 30 - .5) { clearTimeout(captureTimer); flush(); }
     else if (!captureTimer) captureTimer = setTimeout(flush, 1000 / 30 - (now - lastCapture));
   }
   function dispose() {
     if (disposed) return;
-    disposed = true; cancelAnimationFrame(pending); clearTimeout(captureTimer); renderer.dispose(); stage.remove();
+    disposed = true; cancelAnimationFrame(pending); clearTimeout(captureTimer); overlayObserver.disconnect();
+    renderer.dispose(); stage.remove(); overlayRenderer?.dispose(); overlayStage?.remove();
     for (const event of events) document.removeEventListener(event, invalidate, true);
-    window.removeEventListener('resize', invalidate); document.removeEventListener('scroll', invalidate, true);
+    window.removeEventListener('resize', resize); document.removeEventListener('scroll', scroll, true);
     document.removeEventListener('pointermove', pointer);
     document.body.classList.remove('ui-glass-ready');
   }

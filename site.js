@@ -284,7 +284,8 @@
   }
   if (window.LiquidGlass) {
     renderer = new window.LiquidGlass.Renderer(scene, {
-      attachSurfaces: true,
+      attachSurfaces: false,
+      scissorSurfaces: true,
       maxDpr: 2,
       maxPixels: 2600000,
       paintBackground,
@@ -399,9 +400,9 @@
       button.style.setProperty("--shine-y", `${(event.clientY - bounds.top) / bounds.height * 100}%`);
     });
   });
-  let scrollFrame = 0;
   window.addEventListener("scroll", () => {
-    if (!scrollFrame) scrollFrame = requestAnimationFrame(() => { scrollFrame = 0; updateReadingBounds(); });
+    updateReadingBounds(); // The intentional reading mask follows the card.
+    renderer?.renderNow();
   }, {
     passive: true,
   });

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fixed viewport glass regression</title>
+<style>
+  * { box-sizing: border-box; }
+  html { scrollbar-width: none; }
+  body { margin: 0; color: white; font: 15px system-ui; }
+  #source, #scene { position: fixed; inset: 0; pointer-events: none; }
+  #source, #scene > canvas { width: 100%; height: 100%; }
+  #scene { z-index: 1; }
+  main { position: relative; min-height: 1800px; z-index: 2; }
+  article { position: absolute; top: 120px; left: 40px; width: min(580px, calc(100% - 80px)); height: 500px;
+    border-radius: 70px; padding: 72px 40px; isolation: isolate; }
+  button { position: relative; display: block; width: 180px; height: 52px; margin: 24px 0;
+    border: 0; border-radius: 26px; color: inherit; background: transparent; }
+  button:hover { scale: 1.025; } button:active { scale: .97; }
+  .glass-presentation { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: inherit; z-index: -1; }
+  output { position: fixed; right: 12px; top: 12px; font: 12px monospace; }
+</style>
+<canvas id="source"></canvas><div id="scene"><canvas></canvas></div>
+<main><article class="glass-surface" data-radius="70"><h1>Viewport anchored glass</h1>
+  <p>Scroll both ways. The grid stays fixed; the glass and text move.</p>
+  <button class="glass-surface" data-radius="26">Nested surface A</button>
+  <button class="glass-surface" data-radius="26">Nested surface B</button>
+</article></main><output></output>
+<script type="module">
+  import '../../ui-glass-preset.js';
+  const query = new URLSearchParams(location.search);
+  if (query.has('legacy')) await import(/* @vite-ignore */ new URL('./.baseline/viewport-20261025/liquid-glass.js', location.href).href);
+  else await import('../../liquid-glass.js');
+  const mode = query.get('mode') || 'viewport';
+  const preset = window.SiteGlassPreset;
+  const backdrop = document.querySelector('#source');
+  function grid(ctx, width, height) {
+    ctx.fillStyle = '#123047'; ctx.fillRect(0, 0, width, height);
+    for (let x = 0; x < width; x += 64) { ctx.fillStyle = x % 128 ? '#c88e63' : '#4a98bc'; ctx.fillRect(x, 0, 2, height); }
+    for (let y = 0; y < height; y += 64) { ctx.fillStyle = y % 128 ? '#d4c9aa' : '#79b4b9'; ctx.fillRect(0, y, width, 2); }
+  }
+  function paintBackground(ctx, width, height) {
+    grid(ctx, width, height);
+    backdrop.width = Math.round(width * devicePixelRatio); backdrop.height = Math.round(height * devicePixelRatio);
+    const b = backdrop.getContext('2d'); b.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0); grid(b, width, height);
+  }
+  const renderer = new window.LiquidGlass.Renderer(document.querySelector('#scene'), {
+    attachSurfaces: mode === 'attached', overlay: mode === 'overlay', scissorSurfaces: true,
+    maxDpr: 2, maxPixels: 2600000, paintBackground,
+    getSurfaces: () => document.querySelectorAll('.glass-surface'),
+    getState: () => ({ material: preset.material, profile: preset.profile, dark: false, invertedTint: true }),
+  });
+  function flush() { if (renderer.renderNow) renderer.renderNow(); else { cancelAnimationFrame(renderer.frame); renderer.frame = 0; renderer.render(); } }
+  window.addEventListener('scroll', flush, { passive: true });
+  window.addEventListener('resize', () => renderer.resize());
+  for (const button of document.querySelectorAll('button')) {
+    button.addEventListener('pointerenter', flush); button.addEventListener('pointerleave', flush);
+  }
+  document.querySelector('output').textContent = `${query.has('legacy') ? 'legacy / ' : ''}${mode}`;
+  window.glassFixture = {
+    renderer, flush,
+    snapshot() { return { sourceVersion: renderer.sourceVersion, frames: renderer.renderCount,
+      width: renderer.canvas.width, height: renderer.canvas.height, sourceWidth: renderer.textureWidth,
+      sourceHeight: renderer.textureHeight, canvasRect: renderer.canvas.getBoundingClientRect().toJSON(),
+      view: renderer.view, scrollY, layers: document.querySelectorAll('.glass-presentation').length }; },
+    pixels() { flush(); const bytes = new Uint8Array(renderer.canvas.width * renderer.canvas.height * 4);
+      renderer.gl.readPixels(0, 0, renderer.canvas.width, renderer.canvas.height, renderer.gl.RGBA, renderer.gl.UNSIGNED_BYTE, bytes); return bytes; },
+  };
+</script>
+</html>

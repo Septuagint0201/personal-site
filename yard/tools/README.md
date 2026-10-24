@@ -1,5 +1,11 @@
 # YARD rendering performance fixtures
 
+## Fixed-viewport glass regression
+
+Open `/tools/glass-scroll-regression.html` on the Vite development server. The static grid isolates geometry scrolling from real scene/particle updates. `?mode=viewport` is Candy's presentation; `?mode=overlay` checks the transparent notes/picker output. `?mode=attached&legacy=1` uses a saved pre-change renderer at `tools/.baseline/viewport-20261025/liquid-glass.js` (extract `9cf4629:liquid-glass.js` from Git to create it).
+
+`window.glassFixture.snapshot()` reports the source version, buffer dimensions, viewport bounds and per-card layer count. `pixels()` flushes and returns RGBA bytes for like-for-like nested-glass comparisons. Scroll both ways and vary viewport/DPR: fixed mode must keep origin `(0,0)`, keep its source version while only geometry changes, and leave no per-card presentation canvases. Source changes on an actual resize are expected. This fixture is excluded from production builds.
+
 ## Chapter 03 CPU comparison
 
 From `yard/`, run `node tools/benchmark-desert.mjs`. To compare a preserved source copy, use `node tools/benchmark-desert.mjs --baseline=tools/.baseline/desert-sand-20261012`. The optional reference directory must contain `desert-skin.js` and `sand-field.js`; keep reference copies in the ignored `.baseline/` directory before modifying them.

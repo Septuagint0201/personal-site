@@ -30,10 +30,12 @@
     uniform vec2 u_light;
     uniform vec4 u_lens; // Optional scene-only cursor lens: center, radius, strength.
     uniform vec3 u_surface; // Reflection gain, hover amount, interactive lighting.
+    uniform float u_present; // Coverage-only presentation; optical passes stay opaque.
+    uniform vec2 u_pixelScale; // Actual drawing-buffer pixels per viewport CSS pixel.
 
     vec3 sampleScene(vec2 p) {
       vec2 uv = vec2(p.x / u_resolution.x, 1.0 - p.y / u_resolution.y);
-      vec2 halfTexel = 0.5 / (u_resolution * u_dpr);
+      vec2 halfTexel = 0.5 / (u_resolution * u_pixelScale);
       return texture2D(u_texture, clamp(uv, halfTexel, 1.0 - halfTexel)).rgb;
     }
     vec3 activeCorner(vec2 p, vec2 b) {
@@ -157,7 +159,7 @@
       return softened(p, u_material.z);
     }
     void main() {
-      vec2 p = vec2(gl_FragCoord.x / u_dpr, u_resolution.y - gl_FragCoord.y / u_dpr);
+      vec2 p = vec2(gl_FragCoord.x / u_pixelScale.x, u_resolution.y - gl_FragCoord.y / u_pixelScale.y);
       vec3 original = sampleScene(p);
       if (u_rect.z <= 0.0) {
         vec2 delta = p - u_lens.xy;
@@ -171,6 +173,11 @@
       vec2 local = p - u_rect.xy - halfSize;
       float radius = min(u_radius, min(halfSize.x, halfSize.y));
       float dist = roundedBox(local, halfSize, radius);
+      if (u_present > 0.5) {
+        float coverage = 1.0 - smoothstep(-0.75 / u_dpr, 0.75 / u_dpr, dist);
+        gl_FragColor = vec4(original * coverage, coverage);
+        return;
+      }
       if (dist > 1.0 / u_dpr) { gl_FragColor = vec4(original, 1.0); return; }
       // Exact rounded-box gradient avoids finite-difference corner shimmer.
       vec2 outward = boxNormal(local, halfSize, radius);
@@ -281,6 +288,8 @@
       this.height = 0;
       this.frame = 0;
       this.failed = false;
+      this.renderCount = 0;
+      this.disposed = false;
       this.light = [-100, -150];
       this.canvas.addEventListener("webglcontextlost", (event) => {
         event.preventDefault();
@@ -301,7 +310,7 @@
     initialize() {
       try {
         const gl = this.canvas.getContext("webgl", {
-          alpha: false,
+          alpha: !!this.options.overlay,
           antialias: false,
           depth: false,
           stencil: false,
@@ -364,6 +373,8 @@
           "light",
           "lens",
           "surface",
+          "present",
+          "pixelScale",
         ])
           this.uniforms[name] = gl.getUniformLocation(program, `u_${name}`);
         const texture = () => {
@@ -381,6 +392,11 @@
           framebuffer: gl.createFramebuffer(),
         }));
         this.failed = false;
+        if (this.fallbackBackground) {
+          this.element.style.removeProperty('background-image');
+          this.element.style.removeProperty('background-size');
+          this.fallbackBackground = false;
+        }
         this.element.classList.remove("no-webgl");
       } catch (error) {
         this.failed = true;
@@ -390,8 +406,10 @@
       this.options.onStatus?.(this);
     }
     resize() {
-      const width = Math.round(this.element.clientWidth),
-        height = Math.round(this.element.clientHeight);
+      if (this.disposed) return;
+      const bounds = this.element.getBoundingClientRect();
+      const width = this.backdrop ? Math.round(this.element.clientWidth) : bounds.width,
+        height = this.backdrop ? Math.round(this.element.clientHeight) : bounds.height;
       const dpr = Math.min(
         window.devicePixelRatio || 1,
         this.options.maxDpr || 1.5,
@@ -458,11 +476,13 @@
       }
     }
     refreshBackground() {
-      if (!this.width) return;
+      if (this.disposed || !this.width) return;
       const ctx = this.ctx;
-      ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      ctx.setTransform(this.backdrop ? this.dpr : this.background.width / this.width, 0,
+        0, this.backdrop ? this.dpr : this.background.height / this.height, 0, 0);
       this.options.paintBackground(ctx, this.width, this.height);
       if (this.failed) {
+        this.fallbackBackground = true;
         this.element.style.backgroundImage = `url(${this.background.toDataURL()})`;
         this.element.style.backgroundSize = "100% 100%";
         return;
@@ -554,36 +574,59 @@
       }
     }
     request() {
-      if (this.frame || this.failed || document.hidden) return;
+      if (this.disposed || this.frame || this.failed || document.hidden) return;
       this.frame = requestAnimationFrame(() => {
         this.frame = 0;
         this.render();
       });
     }
+    // Scroll events run before paint. Submit current geometry without an extra rAF.
+    // This never invalidates or uploads the fixed viewport's source texture.
+    renderNow() {
+      cancelAnimationFrame(this.frame);
+      this.frame = 0;
+      if (!this.disposed && !document.hidden) this.render();
+    }
+    surfaceBounds(uniforms, surface, rect, view) {
+      const gl = this.gl;
+      gl.uniform4f(uniforms.rect, rect.left - view.left, rect.top - view.top, rect.width, rect.height);
+      const scale = rect.width / (surface.offsetWidth || rect.width);
+      gl.uniform1f(uniforms.radius, (+surface.dataset.radius || 14) * scale);
+      const corners = surface.dataset.radii?.split(',');
+      const fitted = corners?.length === 4
+        ? fitCornerRadii(corners.map(value => Number(value) * scale), rect.width, rect.height) : [-1, -1, -1, -1];
+      gl.uniform4f(uniforms.corners, ...fitted);
+    }
     render() {
-      if (this.failed || !this.width) return;
+      if (this.disposed || this.failed || !this.width) return;
       const gl = this.gl,
         u = this.uniforms,
         state = this.options.getState(),
         m = state.material;
       const profile = state.profile?.kind === "hyperbolic" ? state.profile : null;
       const bounds = this.element.getBoundingClientRect();
+      if (!bounds.width || !bounds.height) return;
       const surfaces = [...(this.options.getSurfaces?.() || this.element.querySelectorAll('.glass-surface'))]
-        .map(surface => ({ surface, rect: surface.getBoundingClientRect() }));
+        .map(surface => ({ surface, rect: surface.getBoundingClientRect(), clip: this.options.getSurfaceClip?.(surface) }));
       const view = this.backdrop ? this.prepareAttachedFrame(bounds, surfaces, m)
         : { left: bounds.left, top: bounds.top, dpr: this.dpr };
+      const cssWidth = this.backdrop ? this.canvas.width / view.dpr : bounds.width;
+      const cssHeight = this.backdrop ? this.canvas.height / view.dpr : bounds.height;
+      const scaleX = this.canvas.width / cssWidth, scaleY = this.canvas.height / cssHeight;
       if (this.failed) return;
       gl.useProgram(this.program);
       gl.viewport(0, 0, this.canvas.width, this.canvas.height);
       gl.activeTexture(gl.TEXTURE0);
       gl.uniform1i(u.texture, 0);
+      gl.uniform1f(u.present, 0);
       // Use exact buffer/CSS scaling to keep sampling aligned at fractional DPRs.
       gl.uniform2f(
         u.resolution,
-        this.canvas.width / view.dpr,
-        this.canvas.height / view.dpr,
+        cssWidth,
+        cssHeight,
       );
       gl.uniform1f(u.dpr, view.dpr);
+      gl.uniform2f(u.pixelScale, scaleX, scaleY);
       gl.uniform1f(u.dark, state.dark ? 1 : 0);
       gl.uniform1f(u.invert, state.invertedTint ? 1 : 0);
       gl.uniform1f(
@@ -624,11 +667,13 @@
       // Seed both targets once. After each draw they differ only in that draw's
       // rectangle, so copying that rectangle synchronizes the next destination.
       const partial = this.options.scissorSurfaces && !passOffset;
-      const clip = rect => {
-        const x = Math.max(0, Math.floor((rect.left - view.left - 3) * view.dpr));
-        const y = Math.max(0, this.canvas.height - Math.ceil((rect.bottom - view.top + 3) * view.dpr));
-        const right = Math.min(this.canvas.width, Math.ceil((rect.right - view.left + 3) * view.dpr));
-        const top = Math.min(this.canvas.height, this.canvas.height - Math.floor((rect.top - view.top - 3) * view.dpr));
+      const clip = (rect, limit) => {
+        if (limit) rect = { left: Math.max(rect.left, limit.left), top: Math.max(rect.top, limit.top),
+          right: Math.min(rect.right, limit.right), bottom: Math.min(rect.bottom, limit.bottom) };
+        const x = Math.max(0, Math.floor((rect.left - view.left - 3) * scaleX));
+        const y = Math.max(0, this.canvas.height - Math.ceil((rect.bottom - view.top + 3) * scaleY));
+        const right = Math.min(this.canvas.width, Math.ceil((rect.right - view.left + 3) * scaleX));
+        const top = Math.min(this.canvas.height, this.canvas.height - Math.floor((rect.top - view.top - 3) * scaleY));
         gl.scissor(x, y, Math.max(0, right - x), Math.max(0, top - y));
       };
       if (partial) {
@@ -641,7 +686,7 @@
         }
         gl.enable(gl.SCISSOR_TEST);
       }
-      surfaces.forEach(({ surface, rect }, index) => {
+      surfaces.forEach(({ surface, rect, clip: limit }, index) => {
         const nested =
             !!surface.parentElement.closest(".glass-surface") ||
             surface.hasAttribute("data-glass-compact");
@@ -650,25 +695,13 @@
         gl.bindTexture(gl.TEXTURE_2D, input);
         if (partial) {
           if (index) {
-            clip(surfaces[index - 1].rect);
+            clip(surfaces[index - 1].rect, surfaces[index - 1].clip);
             gl.uniform4f(u.rect, 0, 0, -1, 0);
             gl.drawArrays(gl.TRIANGLES, 0, 6);
           }
-          clip(rect);
+          clip(rect, limit);
         }
-        gl.uniform4f(
-          u.rect,
-          rect.left - view.left,
-          rect.top - view.top,
-          rect.width,
-          rect.height,
-        );
-        const scale = rect.width / (surface.offsetWidth || rect.width);
-        gl.uniform1f(u.radius, (+surface.dataset.radius || 14) * scale);
-        const corners = surface.dataset.radii?.split(',');
-        const fitted = corners?.length === 4
-          ? fitCornerRadii(corners.map(value => Number(value) * scale), rect.width, rect.height) : [-1, -1, -1, -1];
-        gl.uniform4f(u.corners, ...fitted);
+        this.surfaceBounds(u, surface, rect, view);
         const effects = this.options.getSurfaceEffects?.(surface) || {};
         gl.uniform3f(u.surface, effects.reflection ?? 1, effects.hover ?? 0, effects.interactive ? 1 : 0);
         gl.uniform4f(
@@ -685,13 +718,36 @@
       if (partial) gl.disable(gl.SCISSOR_TEST);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.bindTexture(gl.TEXTURE_2D, input);
-      gl.uniform4f(u.rect, 0, 0, -1, 0);
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      if (this.options.overlay) {
+        // Keep the full scene in the ping-pong buffers for nested refraction,
+        // but expose only root glass footprints in the visible fixed canvas.
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.uniform1f(u.present, 1);
+        gl.enable(gl.SCISSOR_TEST);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+        for (const { surface, rect, clip: limit } of surfaces) {
+          if (surfaces.some(parent => parent.surface !== surface && parent.surface.contains(surface))) continue;
+          clip(rect, limit);
+          this.surfaceBounds(u, surface, rect, view);
+          gl.drawArrays(gl.TRIANGLES, 0, 6);
+        }
+        gl.disable(gl.BLEND);
+        gl.disable(gl.SCISSOR_TEST);
+        gl.uniform1f(u.present, 0);
+      } else {
+        gl.uniform4f(u.rect, 0, 0, -1, 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+      }
       if (this.backdrop) this.presentAttachedFrame(view);
+      this.renderCount++;
+      this.view = { left: view.left, top: view.top, width: cssWidth, height: cssHeight, scaleX, scaleY };
       this.element.dataset.rendered = "true";
     }
     dispose() {
       cancelAnimationFrame(this.frame);
+      this.disposed = true;
       this.observer?.disconnect();
       this.failed = true;
       for (const layer of this.layers.values()) layer.canvas.remove();
