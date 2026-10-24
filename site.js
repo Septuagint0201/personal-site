@@ -5,6 +5,9 @@
   // Captured from the user's active local Thickness Lab. Keep layout dimensions;
   // the radius and shoulder adapt to each control's available inradius.
   const acceptedProfile = window.SiteGlassPreset.profile;
+  const surfaceButtons = window.SiteSurfaceButtons || {
+    classify: nodes => [...nodes], applyTheme() {},
+  }; // An older cached local HTML entry can still display the original glass.
   // Local snapshots only: both previews retain the accepted haze and tint.
   const comparisonProfiles = Object.freeze({
     double: { label: 'A · 双面曲面',
@@ -25,6 +28,7 @@
     surface.dataset.radius = String(chosenProfile.radius);
     surface.style.borderRadius = `${chosenProfile.radius}px`;
   }
+  surfaceButtons.classify(document.querySelectorAll('.glass-surface'));
   const systemTheme = matchMedia("(prefers-color-scheme: light)");
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
   const themeButton = document.getElementById("themeToggle");
@@ -61,6 +65,7 @@
     theme = next;
     dark = theme === "dark" || (theme === "system" && !systemTheme.matches);
     document.documentElement.dataset.theme = dark ? "dark" : "light";
+    surfaceButtons.applyTheme(document.documentElement, dark);
     document.querySelector('meta[name="theme-color"]').content = dark
       ? "#171d30"
       : "#c6cbd6";
@@ -289,7 +294,7 @@
       maxDpr: 2,
       maxPixels: 2600000,
       paintBackground,
-      getSurfaces: () => document.querySelectorAll(".glass-surface"),
+      getSurfaces: () => surfaceButtons.classify(document.querySelectorAll(".glass-surface")),
       getSurfaceEffects: (surface) => ({
         reflection: surface === themeButton ? 0.28 : 1,
         hover: surface.matches(":hover, :focus-visible") && surface.matches("a, button") ? 1 : 0,
@@ -407,6 +412,7 @@
     passive: true,
   });
   window.addEventListener("resize", () => {
+    surfaceButtons.classify(document.querySelectorAll('.glass-surface'));
     updateReadingBounds();
     renderer?.resize();
   });

@@ -14,7 +14,7 @@ await mkdir(candy);
 const hash = data => createHash('sha256').update(data).digest('hex');
 const names = new Map();
 const images = ['avatar.jpg', 'bg.jpg', 'avatar-192.webp', 'avatar-384.webp', 'bg.avif'];
-const scripts = ['site.css', 'ui-glass-preset.js', 'depth-background.js', 'liquid-glass.js', 'site.js'];
+const scripts = ['site.css', 'ui-surface-buttons.css', 'ui-glass-preset.js', 'ui-surface-buttons.js', 'depth-background.js', 'liquid-glass.js', 'site.js'];
 function rewrite(text) {
   for (const [source, destination] of names) {
     const pattern = `${source.replaceAll('.', '\\.')}(?:\\?v=\\d+)?`;
