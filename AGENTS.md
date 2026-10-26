@@ -1,0 +1,7 @@
+# UI glass material decisions
+
+- For future buttons, give size and local button density equal weight (50% each) when choosing a material. Larger buttons favor optical glass; closely packed groups favor the shallow blur/tint surface treatment. An isolated button has a stronger preference for optical glass, even when it is not large.
+- Judge density within the visible local control group, not by counting buttons across the whole page or hidden carousel cards. Use the settled layout rather than temporary hover scaling or animation positions.
+- This is a design-selection rule, not a request to make materials switch dynamically during pointer movement. Keep approved existing treatments unless the user requests changes. The runtime 96px short-side fallback preserves existing pages; do not treat size alone as the new design rule. Record an explicit treatment where needed using `data-surface-treatment="glass"`.
+- Current approved exceptions: YARD's directory buttons use the original optical glass, including the Enter chapter buttons. On the Candy homepage, only the YARD link among the seven content links retains optical glass; GitHub and the other links use the shallow surface treatment. Chapter controls retain their approved treatment.
+- All clickable controls retain hover scaling, hover highlight and click scaling. Preserve the existing blur, tint, theme and layout parameters unless separately requested.

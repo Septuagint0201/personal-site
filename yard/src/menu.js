@@ -33,7 +33,7 @@ stack.innerHTML = chapters
       <div class="card-details">
         <div class="card-art" aria-hidden="true"><img src="${c.cover}" alt="" draggable="false"/><span class="art-index">${c.id}</span></div>
         <div class="card-topline"><span>CHAPTER ${c.id}</span><span class="availability ${c.href ? "is-open" : ""}"><i></i>${c.status}</span></div>
-        <div class="card-content"><p class="card-eyebrow">${c.subtitle}</p><h2>${c.title.split("\n").map(escape).join("<br/>")}</h2><p class="card-description">${c.description}</p>${c.href ? `<a class="enter-chapter" href="${c.href}">Enter chapter <span aria-hidden="true">↗</span></a>` : '<p class="coming-note">✧ &nbsp; A story yet to unfold</p>'}</div>
+        <div class="card-content"><p class="card-eyebrow">${c.subtitle}</p><h2>${c.title.split("\n").map(escape).join("<br/>")}</h2><p class="card-description">${c.description}</p>${c.href ? `<a class="enter-chapter" data-surface-treatment="glass" href="${c.href}">Enter chapter <span aria-hidden="true">↗</span></a>` : '<p class="coming-note">✧ &nbsp; A story yet to unfold</p>'}</div>
         <div class="card-bottomline"><div class="card-tags">${c.tags.map((tag) => `<span>${tag}</span>`).join("")}</div><span class="art-note">${c.note}</span></div>
       </div>
     </div>
