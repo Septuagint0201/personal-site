@@ -6,6 +6,10 @@ Open `/tools/glass-scroll-regression.html` on the Vite development server. The s
 
 `window.glassFixture.snapshot()` reports the source version, buffer dimensions, viewport bounds and per-card layer count. `pixels()` flushes and returns RGBA bytes for like-for-like nested-glass comparisons. Scroll both ways and vary viewport/DPR: fixed mode must keep origin `(0,0)`, keep its source version while only geometry changes, and leave no per-card presentation canvases. Source changes on an actual resize are expected. This fixture is excluded from production builds.
 
+For shared-renderer initialization comparisons, preserve `liquid-glass.js` in `tools/.baseline/<name>/` and use `?baseline=<name>&mode=viewport` (or `overlay` / `attached`). Names accept lowercase letters, digits and hyphens. `snapshot().startup.createdMs` measures the synchronous constructor call; `readyMs` includes asynchronous driver preparation. `maxRenderTaskMs` and `maxResizeTaskMs` check whether blocking work moved into a deferred callback. These are different metrics: moving compilation off the main thread need not reduce total compilation time. Wait for `#scene[data-rendered="true"]` before comparing pixels.
+
+The shared renderer exposes `ready` separately from `failed`: pending compilation is neither a failure nor a usable optical layer. With `KHR_parallel_shader_compile`, it polls completion without synchronous shader/link-status queries, then allocates resources for the latest size and uploads the retained background. `onStatus` reports successful readiness or failure. YARD keeps CSS/attached fallback layers until both the background and the appropriate compositor are ready. Hidden documents suspend polling; visibility resumes it even with a paused scene. Context restoration reacquires extensions and prepares a replacement program. A stalled program falls back after 90 seconds, but completion is checked before applying the deadline; disposal cancels work, removes listeners and deletes pending GPU objects. Drivers without the extension retain synchronous setup.
+
 ## Chapter 03 CPU comparison
 
 From `yard/`, run `node tools/benchmark-desert.mjs`. To compare a preserved source copy, use `node tools/benchmark-desert.mjs --baseline=tools/.baseline/desert-sand-20261012`. The optional reference directory must contain `desert-skin.js` and `sand-field.js`; keep reference copies in the ignored `.baseline/` directory before modifying them.
@@ -19,6 +23,10 @@ The contact/corner follow-up can be compared with `node tools/benchmark-desert.m
 ## Chapter 02 GPU fixture
 
 Run `npm run dev` from `yard/`, then open `/tools/render-benchmark.html`. This fixture is excluded from the explicit Vite production page list. It uses the actual renderer and `EXT_disjoint_timer_query_webgl2` to measure its eight HDR passes. Allow shader preparation to finish before judging performance.
+
+`benchResult.startup` records elapsed time from the beginning of the fixture (including dynamic module loading): `rendererCreatedMs` ends at constructor return, `preparedMs` at the ready callback, and `firstFrameMs` at the first complete frame's draw submission. The last value is not a GPU completion or screen-presentation timestamp. Compare repeated runs at the same viewport and distinguish warmed driver caches from a first visit; cache hits cannot establish cold-compilation speed.
+
+Chapter 02 keeps adaptive sampling in a uniform loop with one spectral transport call site. Derivatives must remain outside the per-fragment sampling branch, and the loop must not exit early per fragment: either change can silently disable edge sampling on real drivers. Compare the captured `benchImage` at entrance/close/side views, both quality presets and discovery effects after editing this path. Startup lifecycle tests also cover deferred HDR allocation, completed background compilations, a genuinely stalled program, non-parallel drivers and context restoration.
 
 The scene is paused for repeatability. Each view has 16 warmup frames and 96 measured frames. The reported total is the median of complete per-frame GPU sums, not the sum of stage medians. If GPU timers are unavailable, `gpuTimer` is false and the value includes JavaScript submission and GPU synchronization; do not compare that fallback with GPU-only results. Use an HDR-capable WebGL2 browser for this fixture.
 

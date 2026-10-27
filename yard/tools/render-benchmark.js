@@ -1,6 +1,8 @@
 // Development-only: Vite's production page list excludes this harness.
 // ?baseline loads a local .baseline copy; ?quality=high exercises that preset.
 const params = new URLSearchParams(location.search);
+const startupStarted = performance.now();
+let rendererCreatedMs = 0, preparedMs = 0, firstFrameMs = 0;
 const { createLiquidRenderer } = await import(/* @vite-ignore */ params.has('baseline')
   ? './.baseline/chapter02-renderer.js' : '../src/chapter02-renderer.js');
 const canvas = document.querySelector('canvas');
@@ -42,6 +44,7 @@ function finish() {
     version: params.has('baseline') ? 'baseline' : 'current', preset,
     effect: activeEffect, simulationTime: Number(params.get('time') || 0),
     flowing, submissionMs: median(submission),
+    startup: { rendererCreatedMs, preparedMs, firstFrameMs },
     quality: renderer.state.quality, resolution: [canvas.width,canvas.height],
     gpuTimer: Boolean(timer), frames: timer ? complete.length : cpu.length,
     frameMs: median(timer ? complete : cpu),
@@ -59,6 +62,7 @@ canvas.getContext = (...args) => {
   gl.drawArrays = (...drawArgs) => {
     if (!running) {
       draw(...drawArgs);
+      if (boundFramebuffer === null && !firstFrameMs) firstFrameMs = performance.now() - startupStarted;
       if(preroll>0 && boundFramebuffer===null && --preroll===0){renderer.setPaused(!flowing);requestAnimationFrame(()=>run(initialPreset));}
       return;
     }
@@ -95,7 +99,8 @@ function run(name) {
   renderer.look(0,0);
 }
 renderer=createLiquidRenderer(canvas,{
-  onReady(){renderer.setPaused(preroll===0 && !flowing);renderer.setQuality(params.get('quality')==='high'?'high':'ultra');if(activeEffect)renderer.setEffect(activeEffect,1e9);if(!preroll)requestAnimationFrame(()=>run(initialPreset));},
+  onReady(){preparedMs=performance.now()-startupStarted;renderer.setPaused(preroll===0 && !flowing);renderer.setQuality(params.get('quality')==='high'?'high':'ultra');if(activeEffect)renderer.setEffect(activeEffect,1e9);if(!preroll)requestAnimationFrame(()=>run(initialPreset));},
   onError(error){result.textContent=String(error);document.body.dataset.status='failed';},
 });
+rendererCreatedMs = performance.now() - startupStarted;
 Object.keys(presets).forEach(name=>document.getElementById(name).onclick=()=>run(name));

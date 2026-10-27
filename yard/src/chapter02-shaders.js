@@ -326,25 +326,34 @@ vec3 cameraRay(vec2 offset){
  return normalize(cameraForward*1.62+cameraRight*p.x+cameraUp*p.y);
 }
 void main(){
- vec3 rd=cameraRay(jitter);Hit first=intersectScene(cameraPosition,rd);
- vec3 color=shadeSample(rd,first);float material=float(first.kind)*.2;
- // Detect edges in display-referred radiance, including equal-luminance RGB
- // dispersion. Derivatives run before divergent sampling. Smooth interiors and
- // walls retain one ray; all wavelengths share each added subpixel location.
- vec3 visible=aces(color*.9);
- vec3 change=fwidth(visible);
- float contrast=max(change.r,max(change.g,change.b));
- float silhouette=fwidth(material);
- float curvature=length(fwidth(first.n));
- bool edge=contrast>.055 || silhouette>.01 || (first.kind>1 && curvature>.13);
- if(edge){
-  for(int sampleIndex=1;sampleIndex<4;sampleIndex++){
-   if(sampleIndex>=edgeSamples)break;
+ Hit first;vec3 color=vec3(0.);float material=0.;bool edge=false;
+ // One transport call site keeps the driver from compiling a second copy of
+ // the complete spectral/reflection graph for adaptive edge samples. The
+ // uniform bound also avoids statically expanding that graph per sample.
+ for(int sampleIndex=0;sampleIndex<edgeSamples;sampleIndex++){
+  vec2 offset=jitter;
+  if(sampleIndex>0){
    vec2 shift=edgeSamples==2?vec2(.5):sampleIndex==1?vec2(.5,0.):sampleIndex==2?vec2(0.,.5):vec2(.5);
-   vec3 ray=cameraRay(fract(jitter+.5+shift)-.5);
-   Hit h=intersectScene(cameraPosition,ray);
-   color+=shadeSample(ray,h);material+=float(h.kind)*.2;
+   offset=fract(jitter+.5+shift)-.5;
   }
+  vec3 sampleColor=vec3(0.),sampleNormal=vec3(0.);float sampleMaterial=0.;
+  if(sampleIndex==0 || edge){
+   vec3 rd=cameraRay(offset);Hit h=intersectScene(cameraPosition,rd);
+   sampleColor=shadeSample(rd,h);sampleMaterial=float(h.kind)*.2;sampleNormal=h.n;
+   if(sampleIndex==0)first=h;
+   color+=sampleColor;material+=sampleMaterial;
+  }
+  // Keep the loop uniform even for smooth pixels. Derivatives inside a loop
+  // with per-fragment exits can be undefined on real graphics drivers.
+  vec3 change=fwidth(aces(sampleColor*.9));
+  float silhouette=fwidth(sampleMaterial);
+  float curvature=length(fwidth(sampleNormal));
+  if(sampleIndex==0){
+   float contrast=max(change.r,max(change.g,change.b));
+   edge=contrast>.055 || silhouette>.01 || (first.kind>1 && curvature>.13);
+  }
+ }
+ if(edge){
   color/=float(edgeSamples);material/=float(edgeSamples);
  }
  // Primary-surface accents run once after transport. Keeping this artistic

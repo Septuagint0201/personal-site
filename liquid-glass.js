@@ -288,26 +288,49 @@
       this.height = 0;
       this.frame = 0;
       this.failed = false;
+      this.ready = false;
       this.renderCount = 0;
       this.disposed = false;
       this.light = [-100, -150];
-      this.canvas.addEventListener("webglcontextlost", (event) => {
+      this.onContextLost = (event) => {
+        if (this.disposed) return;
         event.preventDefault();
+        cancelAnimationFrame(this.frame);
+        this.frame = 0;
+        this.ready = false;
         this.failed = true;
         this.element.classList.add("no-webgl");
         this.refreshBackground();
         this.options.onStatus?.(this);
-      });
-      this.canvas.addEventListener("webglcontextrestored", () => {
+      };
+      this.onContextRestored = () => {
+        if (this.disposed) return;
         this.width = 0;
         this.initialize();
         this.resize();
-      });
+      };
+      this.onVisibility = () => {
+        if (document.hidden) {
+          cancelAnimationFrame(this.frame);
+          this.frame = 0;
+        } else this.request();
+      };
+      this.canvas.addEventListener("webglcontextlost", this.onContextLost);
+      this.canvas.addEventListener("webglcontextrestored", this.onContextRestored);
+      document.addEventListener("visibilitychange", this.onVisibility);
       this.initialize();
       this.observer = new ResizeObserver(() => this.resize());
       this.observer.observe(element);
     }
     initialize() {
+      if (this.disposed) return;
+      this.ready = false;
+      this.failed = false;
+      this.program = this.vertexBuffer = this.sourceTexture = null;
+      this.shaders = [];
+      this.targets = [];
+      this.targetWidth = this.targetHeight = 0;
+      this.preparationStarted = performance.now();
       try {
         const gl = this.canvas.getContext("webgl", {
           alpha: !!this.options.overlay,
@@ -318,31 +341,51 @@
         });
         if (!gl) throw new Error("WebGL unavailable");
         this.gl = gl;
+        // Extensions are invalidated by context loss; reacquire on restoration.
+        this.parallel = gl.getExtension("KHR_parallel_shader_compile");
         this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
         this.textureWidth = this.textureHeight = 0;
         this.backdropKey = null;
         const compile = (type, source) => {
           const shader = gl.createShader(type);
+          this.shaders.push(shader);
           gl.shaderSource(shader, source);
           gl.compileShader(shader);
-          if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-            const message = gl.getShaderInfoLog(shader);
-            gl.deleteShader(shader);
-            throw new Error(message);
-          }
           return shader;
         };
         const vertex = compile(gl.VERTEX_SHADER, vertexSource),
           fragment = compile(gl.FRAGMENT_SHADER, fragmentSource);
-        const program = gl.createProgram();
+        const program = this.program = gl.createProgram();
         gl.attachShader(program, vertex);
         gl.attachShader(program, fragment);
         gl.linkProgram(program);
-        gl.deleteShader(vertex);
-        gl.deleteShader(fragment);
+        gl.flush();
+        // No compile/link status queries until completion: those queries can
+        // otherwise block the main thread even with parallel linking enabled.
+        if (this.parallel) this.request();
+        else this.prepare();
+      } catch (error) {
+        this.fail(error);
+      }
+    }
+    prepare() {
+      if (this.disposed || this.failed) return false;
+      if (this.ready) return true;
+      const gl = this.gl, program = this.program;
+      if (this.parallel && !gl.getProgramParameter(program, this.parallel.COMPLETION_STATUS_KHR)) {
+        if (performance.now() - this.preparationStarted > 90000) {
+          this.fail(new Error("The graphics driver could not finish preparing the glass."));
+          return false;
+        }
+        this.request();
+        return false;
+      }
+      try {
         if (!gl.getProgramParameter(program, gl.LINK_STATUS))
-          throw new Error(gl.getProgramInfoLog(program));
-        this.program = program;
+          throw new Error([gl.getProgramInfoLog(program),
+            ...this.shaders.map(shader => gl.getShaderInfoLog(shader))].filter(Boolean).join("\n"));
+        this.shaders.forEach(shader => gl.deleteShader(shader));
+        this.shaders = [];
         gl.useProgram(program);
         const buffer = this.vertexBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -391,7 +434,7 @@
           texture: texture(),
           framebuffer: gl.createFramebuffer(),
         }));
-        this.failed = false;
+        this.ready = true;
         if (this.fallbackBackground) {
           this.element.style.removeProperty('background-image');
           this.element.style.removeProperty('background-size');
@@ -399,10 +442,21 @@
         }
         this.element.classList.remove("no-webgl");
       } catch (error) {
-        this.failed = true;
-        this.element.classList.add("no-webgl");
-        console.warn("Glass preview unavailable:", error.message);
+        this.fail(error);
+        return false;
       }
+      this.options.onStatus?.(this);
+      return true;
+    }
+    fail(error) {
+      this.ready = false;
+      this.failed = true;
+      cancelAnimationFrame(this.frame);
+      this.frame = 0;
+      this.releaseGpu();
+      this.element.classList.add("no-webgl");
+      this.refreshBackground();
+      console.warn("Glass preview unavailable:", error.message);
       this.options.onStatus?.(this);
     }
     resize() {
@@ -437,6 +491,7 @@
       this.refreshBackground();
     }
     allocateTargets() {
+      if (!this.ready || this.failed) return;
       if (this.targetWidth === this.canvas.width && this.targetHeight === this.canvas.height) return;
       this.targetWidth = this.canvas.width;
       this.targetHeight = this.canvas.height;
@@ -467,9 +522,7 @@
             gl.checkFramebufferStatus(gl.FRAMEBUFFER) !==
             gl.FRAMEBUFFER_COMPLETE
           ) {
-            this.failed = true;
-            this.element.classList.add("no-webgl");
-            this.options.onStatus?.(this);
+            this.fail(new Error("The glass framebuffer is incomplete."));
             break;
           }
         }
@@ -488,6 +541,7 @@
         return;
       }
       this.sourceDirty = true;
+      if (!this.ready) { this.request(); return; }
       if (this.backdrop) { this.request(); return; }
       this.uploadBackground(this.background);
       this.request();
@@ -525,6 +579,7 @@
       if (this.canvas.width !== pixelWidth) this.canvas.width = pixelWidth;
       if (this.canvas.height !== pixelHeight) this.canvas.height = pixelHeight;
       this.allocateTargets();
+      if (this.failed) return null;
       if (this.sourceDirty || key !== this.sourceKey) {
         if (this.extended.width !== pixelWidth) this.extended.width = pixelWidth;
         if (this.extended.height !== pixelHeight) this.extended.height = pixelHeight;
@@ -598,7 +653,12 @@
       gl.uniform4f(uniforms.corners, ...fitted);
     }
     render() {
-      if (this.disposed || this.failed || !this.width) return;
+      if (this.disposed || this.failed || !this.prepare() || !this.width) return;
+      if (!this.backdrop) {
+        this.allocateTargets();
+        if (this.failed) return;
+        if (this.sourceDirty) this.uploadBackground(this.background);
+      }
       const gl = this.gl,
         u = this.uniforms,
         state = this.options.getState(),
@@ -610,10 +670,10 @@
         .map(surface => ({ surface, rect: surface.getBoundingClientRect(), clip: this.options.getSurfaceClip?.(surface) }));
       const view = this.backdrop ? this.prepareAttachedFrame(bounds, surfaces, m)
         : { left: bounds.left, top: bounds.top, dpr: this.dpr };
+      if (this.failed) return;
       const cssWidth = this.backdrop ? this.canvas.width / view.dpr : bounds.width;
       const cssHeight = this.backdrop ? this.canvas.height / view.dpr : bounds.height;
       const scaleX = this.canvas.width / cssWidth, scaleY = this.canvas.height / cssHeight;
-      if (this.failed) return;
       gl.useProgram(this.program);
       gl.viewport(0, 0, this.canvas.width, this.canvas.height);
       gl.activeTexture(gl.TEXTURE0);
@@ -747,17 +807,29 @@
     }
     dispose() {
       cancelAnimationFrame(this.frame);
+      this.frame = 0;
       this.disposed = true;
+      this.ready = false;
       this.observer?.disconnect();
       this.failed = true;
+      this.canvas.removeEventListener("webglcontextlost", this.onContextLost);
+      this.canvas.removeEventListener("webglcontextrestored", this.onContextRestored);
+      document.removeEventListener("visibilitychange", this.onVisibility);
       for (const layer of this.layers.values()) layer.canvas.remove();
       this.layers.clear();
+      this.releaseGpu();
+    }
+    releaseGpu() {
       if (!this.gl) return;
+      for (const shader of this.shaders || []) this.gl.deleteShader(shader);
+      this.shaders = [];
       for (const target of this.targets || []) {
         this.gl.deleteTexture(target.texture); this.gl.deleteFramebuffer(target.framebuffer);
       }
       this.gl.deleteTexture(this.sourceTexture); this.gl.deleteBuffer(this.vertexBuffer);
       this.gl.deleteProgram(this.program);
+      this.targets = [];
+      this.program = this.sourceTexture = this.vertexBuffer = null;
     }
   }
 

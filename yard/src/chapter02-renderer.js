@@ -170,12 +170,7 @@ export function createLiquidRenderer(
     return { program, shaders, ready: false, uniforms: null, position: 0 };
   }
   function configure(entry, names) {
-    if (entry.ready) return true;
-    if (
-      parallel &&
-      !gl.getProgramParameter(entry.program, parallel.COMPLETION_STATUS_KHR)
-    )
-      return false;
+    if (entry.ready) return;
     if (!gl.getProgramParameter(entry.program, gl.LINK_STATUS))
       throw new Error(
         [
@@ -192,7 +187,6 @@ export function createLiquidRenderer(
     );
     entry.position = gl.getAttribLocation(entry.program, "position");
     entry.ready = true;
-    return true;
   }
   function initialize() {
     // Context restoration disables extensions too. Re-enable them before
@@ -269,17 +263,19 @@ export function createLiquidRenderer(
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     convergence = 0;
     targetWidth = targetHeight = 0;
-    resize();
+    invalidate();
   }
   function prepare() {
     if (ready) return true;
-    if (
-      performance.now() - compilationStarted > 90000 &&
-      (!trace.ready || !room.ready || !temporal.ready || !bloom.ready || !resolve.ready)
-    )
-      throw new Error(
-        "The graphics driver could not finish preparing this room.",
-      );
+    // Poll completion before LINK_STATUS/uniform lookups, which can block. A
+    // document returning from the background may already have finished linking;
+    // elapsed wall time alone must not turn that successful load into an error.
+    if (parallel && [trace, room, temporal, bloom, resolve].some(entry =>
+      !gl.getProgramParameter(entry.program, parallel.COMPLETION_STATUS_KHR))) {
+      if (performance.now() - compilationStarted > 90000)
+        throw new Error("The graphics driver could not finish preparing this room.");
+      return false;
+    }
     const sceneUniforms = [
         "resolution",
         "jitter",
@@ -310,19 +306,11 @@ export function createLiquidRenderer(
         "selectedDrop",
         "hdr",
       ];
-    if (!configure(trace, sceneUniforms) || !configure(room, [...sceneUniforms, "sceneImage"])) return false;
-    if (
-      !configure(temporal, [
-        "image",
-        "previousImage",
-        "resolution",
-        "historyWeight",
-        "sceneMotion",
-      ])
-    )
-      return false;
-    if (!configure(bloom, ["image", "resolution", "sourceResolution", "prefilter"])) return false;
-    if (!configure(resolve, ["image", "resolution", "hdr", "bloomNear", "bloomMid", "bloomWide"])) return false;
+    configure(trace, sceneUniforms);
+    configure(room, [...sceneUniforms, "sceneImage"]);
+    configure(temporal, ["image", "previousImage", "resolution", "historyWeight", "sceneMotion"]);
+    configure(bloom, ["image", "resolution", "sourceResolution", "prefilter"]);
+    configure(resolve, ["image", "resolution", "hdr", "bloomNear", "bloomMid", "bloomWide"]);
     if (!ready) {
       for (const entry of [trace, room]) {
         const u = entry.uniforms;
@@ -357,6 +345,7 @@ export function createLiquidRenderer(
         gl.uniform1i(u.hdr, floatTarget ? 1 : 0);
       }
       ready = true;
+      resize();
       previous = 0;
       sampleStarted = 0;
       frames = 0;
@@ -366,6 +355,9 @@ export function createLiquidRenderer(
   }
   function resize() {
     if (destroyed || lost) return;
+    // Large HDR buffers are only needed once the programs can draw. This also
+    // coalesces quality/viewport changes during compilation into one allocation.
+    if (!ready) { invalidate(); return; }
     const rect = canvas.getBoundingClientRect();
     const ultra = state.quality === "ultra";
     const dpr =

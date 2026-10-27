@@ -21,7 +21,7 @@ function capture(state) {
   const surface = nested => ({ getBoundingClientRect: () => nested ? { left: 28, top: 200, width: 364, height: 44 } : outer,
     parentElement: { closest: () => nested ? {} : null }, hasAttribute: () => false, dataset: { radius: nested ? 14 : 36 } });
   const renderer = Object.create(scope.window.LiquidGlass.Renderer.prototype);
-  Object.assign(renderer, { gl, width: 640, height: 720, dpr: 1, light: [0, 0],
+  Object.assign(renderer, { gl, ready: true, width: 640, height: 720, targetWidth: 640, targetHeight: 720, dpr: 1, light: [0, 0],
     canvas: { width: 640, height: 720 }, element: { getBoundingClientRect: () => outer, dataset: {} },
     targets: [{ texture: 1, framebuffer: 1 }, { texture: 2, framebuffer: 2 }], sourceTexture: 0,
     options: { getState: () => state, getSurfaces: () => [surface(false), surface(true)] },

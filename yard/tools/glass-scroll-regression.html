@@ -28,7 +28,9 @@
 <script type="module">
   import '../../ui-glass-preset.js';
   const query = new URLSearchParams(location.search);
-  if (query.has('legacy')) await import(/* @vite-ignore */ new URL('./.baseline/viewport-20261025/liquid-glass.js', location.href).href);
+  const reference = query.get('baseline');
+  if (reference && /^[a-z0-9-]+$/.test(reference)) await import(/* @vite-ignore */ new URL(`./.baseline/${reference}/liquid-glass.js`, location.href).href);
+  else if (query.has('legacy')) await import(/* @vite-ignore */ new URL('./.baseline/viewport-20261025/liquid-glass.js', location.href).href);
   else await import('../../liquid-glass.js');
   const mode = query.get('mode') || 'viewport';
   const preset = window.SiteGlassPreset;
@@ -43,22 +45,37 @@
     backdrop.width = Math.round(width * devicePixelRatio); backdrop.height = Math.round(height * devicePixelRatio);
     const b = backdrop.getContext('2d'); b.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0); grid(b, width, height);
   }
+  const startup = { createdMs: 0, readyMs: 0, maxRenderTaskMs: 0, maxResizeTaskMs: 0 };
+  // Include deferred GL setup: a cheap constructor alone does not prove the
+  // blocking work was removed instead of moved into the next animation frame.
+  for (const [method, metric] of [['render', 'maxRenderTaskMs'], ['resize', 'maxResizeTaskMs']]) {
+    const original = window.LiquidGlass.Renderer.prototype[method];
+    window.LiquidGlass.Renderer.prototype[method] = function (...args) {
+      const before = performance.now();
+      try { return original.apply(this, args); }
+      finally { startup[metric] = Math.max(startup[metric], performance.now() - before); }
+    };
+  }
+  const started = performance.now();
   const renderer = new window.LiquidGlass.Renderer(document.querySelector('#scene'), {
     attachSurfaces: mode === 'attached', overlay: mode === 'overlay', scissorSurfaces: true,
     maxDpr: 2, maxPixels: 2600000, paintBackground,
     getSurfaces: () => document.querySelectorAll('.glass-surface'),
     getState: () => ({ material: preset.material, profile: preset.profile, dark: false, invertedTint: true }),
+    onStatus(instance) { if (!instance.failed) startup.readyMs = performance.now() - started; },
   });
+  startup.createdMs = performance.now() - started;
   function flush() { if (renderer.renderNow) renderer.renderNow(); else { cancelAnimationFrame(renderer.frame); renderer.frame = 0; renderer.render(); } }
   window.addEventListener('scroll', flush, { passive: true });
   window.addEventListener('resize', () => renderer.resize());
   for (const button of document.querySelectorAll('button')) {
     button.addEventListener('pointerenter', flush); button.addEventListener('pointerleave', flush);
   }
-  document.querySelector('output').textContent = `${query.has('legacy') ? 'legacy / ' : ''}${mode}`;
+  document.querySelector('output').textContent = `${reference || (query.has('legacy') ? 'legacy' : 'current')} / ${mode}`;
   window.glassFixture = {
     renderer, flush,
-    snapshot() { return { sourceVersion: renderer.sourceVersion, frames: renderer.renderCount,
+    snapshot() { return { ready: renderer.ready ?? !renderer.failed, failed: renderer.failed, startup,
+      sourceVersion: renderer.sourceVersion, frames: renderer.renderCount,
       width: renderer.canvas.width, height: renderer.canvas.height, sourceWidth: renderer.textureWidth,
       sourceHeight: renderer.textureHeight, canvasRect: renderer.canvas.getBoundingClientRect().toJSON(),
       view: renderer.view, scrollY, layers: document.querySelectorAll('.glass-presentation').length }; },

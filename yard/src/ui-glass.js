@@ -23,7 +23,7 @@ export function createUIGlass({ dark = false, maxFps = 0 } = {}) {
   let capturedCanvas = null, capturedVersion;
   let overlayHost = null, overlayStage = null, overlayRenderer = null;
   const pacer = maxFps > 0 ? createFramePacer(maxFps) : null;
-  const overlayActive = () => ready && overlayHost && overlayRenderer && !overlayRenderer.failed;
+  const overlayActive = () => ready && overlayHost && overlayRenderer?.ready && !overlayRenderer.failed;
   const surfaces = (scope = null, omitted = null) => {
     const nodes = [...document.querySelectorAll('button, a, dialog, .notes-card, .controls, .study-controls, .interaction-dock, .glass-select-menu, .move-stick, .stick-thumb, .toast, .announcement, .gallery-announcement')]
       .filter(node => !node.matches('.glass-arrow, .side-select, .stick-direction, .notes-shell')
@@ -55,7 +55,7 @@ export function createUIGlass({ dark = false, maxFps = 0 } = {}) {
     getSurfaceEffects: node => ({ reflection: node.matches('button, a') ? .7 : 1,
       hover: node.matches(':hover, :focus-visible') ? 1 : 0, interactive: node.matches('button, a, [role="option"]') }),
     paintBackground(ctx, width, height) { if (ready) ctx.drawImage(snapshot, 0, 0, width, height); },
-    onStatus(instance) { document.body.classList.toggle('ui-glass-ready', ready && !instance.failed); },
+    onStatus(instance) { document.body.classList.toggle('ui-glass-ready', ready && instance.ready && !instance.failed); },
   });
   function syncOverlay() {
     const host = document.querySelector('dialog[open]') || document.querySelector('.glass-select-menu:not([hidden])');
@@ -136,7 +136,7 @@ export function createUIGlass({ dark = false, maxFps = 0 } = {}) {
     if (snapshot.height !== height) snapshot.height = height;
     context.drawImage(canvas, 0, 0, width, height);
     ready = true;
-    document.body.classList.toggle('ui-glass-ready', !renderer.failed);
+    document.body.classList.toggle('ui-glass-ready', renderer.ready && !renderer.failed);
     // Always retain the final frame, even when motion stops between UI ticks.
     const flush = () => {
       captureTimer = 0;

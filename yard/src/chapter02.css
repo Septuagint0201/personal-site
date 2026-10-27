@@ -1162,7 +1162,8 @@ button {
     display: inline;
   }
   .walk-help {
-    bottom: 211px;
+    /* The shared capsule minimum is taller than the original 34px controls. */
+    bottom: 232px;
     font-size: 8px;
   }
   .chamber-settings {
@@ -1415,7 +1416,7 @@ button {
     bottom: 157px;
   }
   .walk-help {
-    bottom: 198px;
+    bottom: 210px;
     font-size: 7px;
   }
   .gallery-announcement {
