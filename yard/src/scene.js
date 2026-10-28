@@ -695,7 +695,8 @@ export function createPlayground(stage, { onHit, onHold, onSceneChange, onFrame,
     }
     renderer.render(scene, camera);
     glassArrows.render();
-    onFrame?.(renderer.domElement);
+    const continuous = moving || trackMoving || cameraRig.moving || now < activityUntil;
+    onFrame?.(renderer.domElement, undefined, continuous);
     if (stage.dataset.ready !== 'true') stage.dataset.ready = 'true';
     // Sample actual frames once, and only trade resolution for latency when needed.
     if (!adaptationDone && moving && delta > 0 && time > 2) {
@@ -706,7 +707,7 @@ export function createPlayground(stage, { onHit, onHold, onSceneChange, onFrame,
       }
     }
     rendering = false;
-    if (moving || trackMoving || cameraRig.moving || now < activityUntil) raf = requestAnimationFrame(render);
+    if (continuous) raf = requestAnimationFrame(render);
   }
   stage.dataset.scene = 'prism';
   stage.dataset.atmosphere = 'moonlight';

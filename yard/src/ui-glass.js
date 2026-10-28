@@ -23,6 +23,7 @@ export function createUIGlass({ dark = false, maxFps = 0 } = {}) {
   let capturedCanvas = null, capturedVersion;
   let overlayHost = null, overlayStage = null, overlayRenderer = null;
   const pacer = maxFps > 0 ? createFramePacer(maxFps) : null;
+  const capturePacer = createFramePacer(30);
   const overlayActive = () => ready && overlayHost && overlayRenderer?.ready && !overlayRenderer.failed;
   const surfaces = (scope = null, omitted = null) => {
     const nodes = [...document.querySelectorAll('button, a, dialog, .notes-card, .controls, .study-controls, .interaction-dock, .glass-select-menu, .move-stick, .stick-thumb, .toast, .announcement, .gallery-announcement')]
@@ -44,8 +45,7 @@ export function createUIGlass({ dark = false, maxFps = 0 } = {}) {
     }
     return surfaceButtons.classify(nodes).filter(node => (!scope || node === scope || scope.contains(node))
       && (!omitted || (node !== omitted && !omitted.contains(node)))
-      && (node.checkVisibility ? node.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) : node.getClientRects().length > 0)
-      && node.getBoundingClientRect().width > 1 && node.getBoundingClientRect().height > 1);
+      && (node.checkVisibility ? node.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) : node.getClientRects().length > 0));
   };
   const renderer = new window.LiquidGlass.Renderer(stage, {
     canvas: buffer, attachSurfaces: true, hideBackdrop: true, scissorSurfaces: true,
@@ -120,18 +120,26 @@ export function createUIGlass({ dark = false, maxFps = 0 } = {}) {
     if (syncOverlay()) renderer.renderNow();
     (overlayActive() ? overlayRenderer : renderer).renderNow();
   }
-  const overlayObserver = new MutationObserver(invalidate);
-  overlayObserver.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['open', 'hidden'] });
+  const overlayObserver = new MutationObserver(records => {
+    // Setting .hidden to its existing value still emits a mutation. Telemetry
+    // must not keep the 350ms interaction animation alive indefinitely.
+    if (records.some(record => record.oldValue !== record.target.getAttribute(record.attributeName))) invalidate();
+  });
+  overlayObserver.observe(document.body, { subtree: true, attributes: true, attributeOldValue: true, attributeFilter: ['open', 'hidden'] });
   window.addEventListener('resize', resize);
   document.addEventListener('scroll', scroll, true);
   document.addEventListener('pointermove', pointer, { passive: true });
-  function capture(canvas, version) {
+  function capture(canvas, version, continuous = false) {
     if (disposed || renderer.failed || document.hidden || !canvas?.width || !canvas?.height) return;
     if (version !== undefined && canvas === capturedCanvas && version === capturedVersion) return;
-    capturedCanvas = canvas; capturedVersion = version;
     const now = performance.now();
     const ratio = Math.min(2, devicePixelRatio || 1, Math.sqrt(1600000 / (innerWidth * innerHeight)));
     const width = Math.round(innerWidth * ratio), height = Math.round(innerHeight * ratio);
+    const resized = snapshot.width !== width || snapshot.height !== height || capturedCanvas !== canvas;
+    // Only skip an intermediate frame when the caller will render another one.
+    // The final/paused frame is copied immediately, before WebGL discards it.
+    if (!capturePacer.ready(now, !continuous || resized)) return;
+    capturedCanvas = canvas; capturedVersion = version;
     if (snapshot.width !== width) snapshot.width = width;
     if (snapshot.height !== height) snapshot.height = height;
     context.drawImage(canvas, 0, 0, width, height);

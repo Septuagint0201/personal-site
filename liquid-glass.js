@@ -667,7 +667,8 @@
       const bounds = this.element.getBoundingClientRect();
       if (!bounds.width || !bounds.height) return;
       const surfaces = [...(this.options.getSurfaces?.() || this.element.querySelectorAll('.glass-surface'))]
-        .map(surface => ({ surface, rect: surface.getBoundingClientRect(), clip: this.options.getSurfaceClip?.(surface) }));
+        .map(surface => ({ surface, rect: surface.getBoundingClientRect(), clip: this.options.getSurfaceClip?.(surface) }))
+        .filter(({ rect }) => rect.width > 0 && rect.height > 0);
       const view = this.backdrop ? this.prepareAttachedFrame(bounds, surfaces, m)
         : { left: bounds.left, top: bounds.top, dpr: this.dpr };
       if (this.failed) return;

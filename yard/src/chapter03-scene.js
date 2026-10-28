@@ -405,7 +405,8 @@ export function createDesertScene(stage, { onStatus = () => {}, onDetach = () =>
     }
     groundUniforms.sandClock.value = time;
     renderer.render(scene, camera);
-    onFrame?.(renderer.domElement);
+    const continuous = Boolean((!paused && ((!reduced.matches && moving) || (!returnToView.inView && moving) || returnToView.pending || sand.active || grains.activeCount > 0)) || press || time < activeUntil || Math.abs(hover - Number(hoveredBody)) > .001 || pressed > .001);
+    onFrame?.(renderer.domElement, undefined, continuous);
     if (now - statusAt > 160) {
       onStatus({ phase: physics.phase, distance: physics.distance, volumeRatio: physics.volumeRatio,
         contacts: physics.contacts, marks: sand.revision, paused, quality });
@@ -417,7 +418,7 @@ export function createDesertScene(stage, { onStatus = () => {}, onDetach = () =>
       stage.dataset.surfaceTriangles = String(body.geometry.index.count / 3);
       stage.dataset.ready = 'true'; statusAt = now;
     }
-    if ((!paused && ((!reduced.matches && moving) || (!returnToView.inView && moving) || returnToView.pending || sand.active || grains.activeCount > 0)) || press || time < activeUntil || Math.abs(hover - Number(hoveredBody)) > .001 || pressed > .001) invalidate();
+    if (continuous) invalidate();
     else previous = 0;
   }
   function invalidate() { if (!frame && !destroyed && !lost && !document.hidden) frame = requestAnimationFrame(render); }

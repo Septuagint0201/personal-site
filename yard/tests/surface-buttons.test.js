@@ -37,6 +37,15 @@ test('classification uses layout dimensions and reverses cleanly after a resize'
   assert.equal(classes.has('surface-button-frost'), false);
 });
 
+test('explicit optical-glass controls do not need a size measurement', () => {
+  const node = { dataset: { surfaceTreatment: 'glass' }, matches: () => true,
+    parentElement: { closest: () => ({}) },
+    get offsetWidth() { assert.fail('explicit materials do not depend on width'); },
+    get offsetHeight() { assert.fail('explicit materials do not depend on height'); },
+    classList: { contains: () => false } };
+  assert.equal(policy.classify([node])[0], node);
+});
+
 test('the saved surface values stay constant while the theme changes only tint brightness', () => {
   const values = {};
   const root = { style: { setProperty: (key, value) => { values[key] = value; } } };

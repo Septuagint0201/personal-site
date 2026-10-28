@@ -18,11 +18,13 @@ function announce(text) {
 }
 function showPause(value) {
   paused = value;
-  $('#pause').setAttribute('aria-pressed', String(value));
-  $('#pause').textContent = value ? 'Resume' : 'Pause';
+  const button = $('#pause');
+  if (button.getAttribute('aria-pressed') === String(value)) return;
+  button.setAttribute('aria-pressed', String(value));
+  button.textContent = value ? 'Resume' : 'Pause';
 }
 function status(state) {
-  $('#fallback').hidden = true;
+  if (!$('#fallback').hidden) $('#fallback').hidden = true;
   if (!$('#loading').classList.contains('is-ready')) {
     $('#loading').classList.add('is-ready');
     readyTimer = setTimeout(() => { $('#loading').hidden = true; }, 650);

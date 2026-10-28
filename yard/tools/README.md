@@ -10,6 +10,26 @@ For shared-renderer initialization comparisons, preserve `liquid-glass.js` in `t
 
 The shared renderer exposes `ready` separately from `failed`: pending compilation is neither a failure nor a usable optical layer. With `KHR_parallel_shader_compile`, it polls completion without synchronous shader/link-status queries, then allocates resources for the latest size and uploads the retained background. `onStatus` reports successful readiness or failure. YARD keeps CSS/attached fallback layers until both the background and the appropriate compositor are ready. Hidden documents suspend polling; visibility resumes it even with a paused scene. Context restoration reacquires extensions and prepares a replacement program. A stalled program falls back after 90 seconds, but completion is checked before applying the deadline; disposal cancels work, removes listeners and deletes pending GPU objects. Drivers without the extension retain synchronous setup.
 
+## Steady-state interface work — 2026-10-27
+
+Reference: `38d8e6b`. The three chapter renderers now tell `onFrame(canvas, version, continuous)` whether they will schedule another frame. Only intermediate snapshots are paced at the existing 30Hz UI refresh rate; the last frame, a new source and a resized viewport are copied immediately while the WebGL drawing buffer still exists. Callers without this hint retain the previous behavior. Do not defer the final canvas read to a timer: the browser may already have cleared a non-preserved WebGL buffer. The timer may defer compositing the retained snapshot instead.
+
+Repeated writes of the same `hidden` value previously extended the interface's 350ms interaction loop on every Chapter 03 status update. Status writes now change only when needed, and the shared observer ignores unchanged `open`/`hidden` values. Real changes still animate. Surface rectangles are measured once by the compositor; explicitly approved optical-glass buttons skip size-based material measurement.
+
+Local browser work counts below cover 600 animation callbacks, approximately 2.5 seconds on the 240Hz test display, at 1280 × 720 and DPR 1. Allow loading/interaction transitions to settle before recording. These count JavaScript/graphics API work, not FPS or GPU time; the chapter rendering cadence, buffers, optical quality and simulation are unchanged.
+
+| Work | Reference | Updated |
+| --- | ---: | ---: |
+| Chapter 03 UI compositor draws | 600 | 75 |
+| Chapter 03 total bounding-rectangle reads | 7,800 | 375 |
+| Chapter 02 scene-to-UI snapshot copies | 150 | 75 |
+| Chapter 02 total bounding-rectangle reads | 2,325 | 825 |
+| Chapter 01 canvas-to-canvas copies, excluding arrow/presentation layers | 827 | 300 |
+| Directory total bounding-rectangle reads | 1,875 | 975 |
+| Homepage size-property reads per UI frame | 17 | 15 |
+
+The static grid comparison is pixel-identical for viewport, attached and overlay presentations. All three paused chapters stopped extra UI draws/copies after settling; paused notes survived a real WebGL context restoration. Regression tests cover 60–240Hz sources, the final paused frame, resize/source replacement, skipped versions, hidden/disposed pages and idempotent attribute mutations. Mobile checks cover all four YARD pages, High defaults, overlays and overflow. These checks supplement the existing simulation/optics tests rather than claiming every interaction or device was measured.
+
 ## Chapter 03 CPU comparison
 
 From `yard/`, run `node tools/benchmark-desert.mjs`. To compare a preserved source copy, use `node tools/benchmark-desert.mjs --baseline=tools/.baseline/desert-sand-20261012`. The optional reference directory must contain `desert-skin.js` and `sand-field.js`; keep reference copies in the ignored `.baseline/` directory before modifying them.

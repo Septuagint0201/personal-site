@@ -663,7 +663,10 @@ export function createLiquidRenderer(
       gl.uniform1i(resolve.uniforms[name], 2 + i);
     });
     gl.drawArrays(gl.TRIANGLES, 0, 3);
-    onFrame?.(canvas);
+    const continuous = Boolean(!state.paused || movement[0] || movement[1] || gathering || effectId || convergence < 32
+      || Math.abs(hoverValue - (selectedId !== null ? 1 : 0)) > 0.005 || clock - pressTime < 0.6
+      || clock - interactionTime < 1.5 || gatherGlow > 0.005);
+    onFrame?.(canvas, undefined, continuous);
     frames++;
     if (!sampleStarted) sampleStarted = now;
     if (now - sampleStarted > 2500) {
@@ -695,18 +698,7 @@ export function createLiquidRenderer(
       });
       statusClock = clock;
     }
-    if (
-      !state.paused ||
-      movement[0] ||
-      movement[1] ||
-      gathering ||
-      effectId ||
-      convergence < 32 ||
-      Math.abs(hoverValue - (selectedId !== null ? 1 : 0)) > 0.005 ||
-      clock - pressTime < 0.6
-      || clock - interactionTime < 1.5 || gatherGlow > 0.005
-    )
-      invalidate();
+    if (continuous) invalidate();
     else previous = 0;
   }
   function invalidate() {

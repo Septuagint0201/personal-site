@@ -17,9 +17,10 @@
     for (const node of nodes) {
       const eligible = node.matches(interactive);
       const nested = eligible && !!node.parentElement?.closest(parentSelector);
+      const forceGlass = node.dataset.surfaceTreatment === 'glass';
       const frosted = isFrosted({ interactive: eligible, nested,
-        width: nested ? node.offsetWidth : 0, height: nested ? node.offsetHeight : 0,
-        forceGlass: node.dataset.surfaceTreatment === 'glass' });
+        width: nested && !forceGlass ? node.offsetWidth : 0, height: nested && !forceGlass ? node.offsetHeight : 0,
+        forceGlass });
       if (node.classList.contains('surface-button-frost') !== frosted) node.classList.toggle('surface-button-frost', frosted);
       if (!frosted) glass.push(node);
     }

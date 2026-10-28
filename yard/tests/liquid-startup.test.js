@@ -4,7 +4,7 @@ import { createLiquidRenderer } from '../src/chapter02-renderer.js';
 
 function setup(t, { parallel = true } = {}) {
   let now = 0, nextFrame = 0;
-  const frames = new Map(), programs = [], allocations = [], errors = [];
+  const frames = new Map(), programs = [], allocations = [], errors = [], frameHints = [];
   const constants = new Map();
   const gl = new Proxy({
     getParameter: () => 16384,
@@ -42,14 +42,15 @@ function setup(t, { parallel = true } = {}) {
     Object.defineProperty(globalThis, key, { value, configurable: true, writable: true });
   t.mock.method(performance, 'now', () => now);
   let ready = 0;
-  const renderer = createLiquidRenderer(canvas, { onReady: () => ready++, onError: error => errors.push(error) });
+  const renderer = createLiquidRenderer(canvas, { onReady: () => ready++, onError: error => errors.push(error),
+    onFrame: (_, version, continuous) => frameHints.push(continuous) });
   t.after(() => {
     renderer.dispose();
     for (const [key, descriptor] of descriptors)
       if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key];
   });
   return {
-    renderer, programs, allocations, errors, document, canvas,
+    renderer, programs, allocations, errors, document, canvas, frameHints,
     get ready() { return ready; },
     tick(time) {
       now = time;
@@ -115,4 +116,16 @@ test('restoring a graphics context prepares again before reallocating', t => {
   run.tick(48);
   assert.equal(run.ready, 2);
   assert.equal(run.allocations.length, 16);
+});
+
+test('paused convergence marks the final WebGL frame for immediate retention', t => {
+  const run = setup(t, { parallel: false });
+  run.tick(16); assert.equal(run.frameHints.at(-1), true);
+  run.renderer.setPaused(true);
+  for (let time = 33; time < 3000; time += 17) run.tick(time);
+  assert.ok(run.frameHints.length > 2);
+  assert.equal(run.frameHints.at(-1), false);
+  const settled = run.frameHints.length;
+  run.tick(4000);
+  assert.equal(run.frameHints.length, settled);
 });
